@@ -72,8 +72,6 @@ for (i in 1:length(a)){
   print(paste0("Loaded: ", temp, "0"))
 }
 
-
-
 # Wrangle Data -----------------------------------------------------------------
 
 # oralhistory_ref <- oral_histories_original0 |> 
@@ -81,7 +79,8 @@ for (i in 1:length(a)){
 #   dplyr::distinct() 
 # write_csv(x = oralhistory_ref, file = "data/oralhistory_ref.csv", col_names = TRUE)
 
-oralhistory_ref <- oralhistory_ref_edited0
+oralhistory_ref <- oralhistory_ref_edited0 |> 
+  dplyr::mutate(indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous"))
 
 # Aesthetics -------------------------------------------------------------------
 
@@ -119,8 +118,8 @@ theme_custom <- function() {
 save_figures<-function(figure,
                        header = "",
                        footnotes = "",
-                       filename0 = "x",
-                       path = "./",
+                       filename0 = NULL,
+                       path = "./output/",
                        width = 6,
                        height = 6,
                        output_type = c("pdf", "png"),
@@ -128,9 +127,11 @@ save_figures<-function(figure,
                        alttext = "",
                        filename_desc = "",
                        nickname = "",
-                       raw = NULL, 
-                       bg = "white"
+                       table_raw = NULL, 
+                       bg = "transparent"
 ){
+  
+  filename0 <- ifelse(is.null("filename0"), filename0, nickname)
   
   header<-trimws(header)
   header<-paste0(ifelse(substr(x = header,
@@ -159,20 +160,20 @@ save_figures<-function(figure,
       
     }
     
-    # raw
+    # table_raw
     
-    # Save raw file (no rounding, no dividing)
-    if (!(is.null(raw)) &
-        (is.data.frame(raw) | is.matrix(raw))) {
+    # Save table_raw file (no rounding, no dividing)
+    if (!(is.null(table_raw)) &
+        (is.data.frame(table_raw) | is.matrix(table_raw))) {
       # for (i in 1:length(output_type)){
-      utils::write.table(x = raw,
+      utils::write.table(x = table_raw,
                          file = paste0(path, nickname,
                                        ".csv"),
                          sep = ",",
                          row.names=FALSE, col.names = TRUE, append = F)
       # }
     } else {
-      raw <- ""
+      table_raw <- ""
     }
     
   }
@@ -185,7 +186,7 @@ save_figures<-function(figure,
   
   # Save Graphic/Figure as .rdata
   obj <- list("figure" = figure,
-              "raw" = raw,
+              "table_raw" = table_raw,
               "caption" = caption,
               "header" = header,
               "nickname" = nickname,
@@ -198,69 +199,41 @@ save_figures<-function(figure,
   
 }
 
-
-
-save_materials <- function(
-    nickname, 
-    table_raw, 
-    
-){
-  figtab <- dplyr::case_when(
-    grepl(pattern = "fig-", x = nickname) ~ "fig",
-    grepl(pattern = "tab-", x = nickname) ~ "tab"
-  )
-  
-  if (figtab == "fig") {
-    # Systematically save your plot with this function
-    save_figures(
-      figure = figure_print, 
-      raw = ifelse(exists("table_raw", mode = "list"), table_raw, ""), 
-      # header = ifelse(exists("header", mode = "character"), header, ""),
-      # footnotes = unlist(ifelse(exists("footnotes", mode = "character"), list(footnotes), "")), 
-      alttext = ifelse(exists("alttext", mode = "character"), alttext, header),
-      filename0 = ifelse(exists("filename0", mode = "character"), filename0, nickname), 
-      nickname = ifelse(exists("nickname", mode = "character"), nickname, filename0),
-      width = ifelse(exists("width", mode = "numeric"), width, 6), 
-      height = ifelse(exists("height", mode = "numeric"), height, 6),
-      path = dir_out_figtab, 
-      bg = ifelse(exists("bg", mode = "character"), bg, "transparent"))
-    
-  } else if (figtab == "tab") {
-    # Systematically save your table with this function
-    save_tables(
-      table_raw = table_raw, 
-      table_print = table_print,
-      header = ifelse(exists("header", mode = "character"), header, ""),
-      footnotes = unlist(ifelse(exists("footnotes", mode = "character"), list(footnotes), "")), 
-      alttext = ifelse(exists("alttext", mode = "character"), alttext, header),
-      filename0 = ifelse(exists("filename0", mode = "character"), filename0, nickname), 
-      nickname = ifelse(exists("nickname", mode = "character"), nickname, filename0),
-      path = dir_out_figtab)
-  }
-  
-  
-  # make sure you dont mistakenly name other files with these names
-  remove_who <- c()
-  remove_who0 <- c("figure_print", "header", "footnotes", "subobj", "newobj", #"nickname", 
-                   "filename_desc", "alttext", "width", "height", 
-                   "table_raw", "table_print")
-  for (i in 1:length(remove_who0)){
-    if(exists(remove_who0[i]) & !exists(remove_who0[i], mode = "function")){
-      remove_who <- c(remove_who, remove_who0[i])
-    }
-  }
-  remove(list = remove_who)
-  
-}
-
-
 # Prep figures -----------------------------------------------------------------
 
-## Figure 2: bar chart of themes -----------------------------------------------
+## Figure 1: Hierarchical plot of themes -----------------------------------------------
+#NOT DONE
+nickname0 <- "fig-1-hierarchical-themes-auto-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
 
-nickname <- "fig-bar-themes"
-height <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-width <- full_page_portrait_width
+table_raw <- code_references_interviews0[,1:6] 
+names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
+
+table_raw0 <- table_raw <- hier_interviews0
+
+colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+
+### Grouped bar plot by narrator name with grouping rectangle ------------------
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = name, y = freq, fill = cat)) +
+  ggplot2::geom_bar(position="dodge", stat="identity") +
+  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+                             values = colors0) +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_x_discrete(name = "Interviewee") +
+  theme_custom() + 
+  ggplot2::theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
+  ) 
+nickname <- paste0(nickname0, "_group_name")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+nickname0 <- "fig-1-bar-themes-auto-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
 
 table_raw <- code_references_interviews0[,1:6] 
 names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
@@ -274,9 +247,9 @@ table_raw0 <- table_raw <- table_raw|>
     # name = gsub(pattern = "-", replacement = " ", x = name), 
     # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
     # name = stringr::str_to_title(name)
-    ) |> 
+  ) |> 
   dplyr::left_join(oralhistory_ref |> 
-                     dplyr::select(id, name = source, category, fishing_experience, collection, demographic)) |>
+                     dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
   dplyr::select(-x1) |> 
   tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
   dplyr::mutate(cat = stringr::str_to_sentence(cat))
@@ -307,6 +280,63 @@ figure_print <-
   ggplot2::theme(
     axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
   ) 
+nickname <- paste0(nickname0, "_group_name")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+
+## Figure 2: bar chart of themes -----------------------------------------------
+
+nickname0 <- "fig-2-bar-themes"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
+
+table_raw <- code_references_interviews0[,1:6] 
+names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
+
+table_raw0 <- table_raw <- table_raw |> 
+  dplyr::mutate(
+    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) # , 
+    # name = substr(x = x1, start = 12, stop = nchar(x1)), 
+    # name = gsub(pattern = "\\\\", replacement = "", x = name), 
+    # name = gsub(pattern = "_", replacement = " ", x = name), 
+    # name = gsub(pattern = "-", replacement = " ", x = name), 
+    # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
+    # name = stringr::str_to_title(name)
+    ) |> 
+  dplyr::left_join(oralhistory_ref |> 
+                     dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
+  dplyr::select(-x1) |> 
+  tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
+  dplyr::mutate(cat = stringr::str_to_sentence(cat))
+
+table_raw_rect <- table_raw |> 
+  dplyr::select(id) |>
+  dplyr::distinct() |> 
+  dplyr::mutate(
+    xmin = id - 0.45, # approx start of group
+    xmax = id + 0.45,  # approx end of group
+    ymin = 0, 
+    ymax = max(table_raw$freq)
+  )
+
+colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+
+### Grouped bar plot by narrator name with grouping rectangle ------------------
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = name, y = freq, fill = cat)) +
+  ggplot2::geom_bar(position="dodge", stat="identity") +
+  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+                             values = colors0) +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_x_discrete(name = "Interviewee") +
+  theme_custom() + 
+  ggplot2::theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
+  ) 
+nickname <- paste0(nickname0, "_group_name")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Grouped bar plot by ID with grouping rectangle -----------------------------
 figure_print <- 
@@ -327,10 +357,14 @@ figure_print <-
     alpha = 0.1,     # transparency of the fill
     inherit.aes = FALSE # prevents inheriting main plot aesthetics
   ) 
+nickname <- paste0(nickname0, "_groupid")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Grouped bar plot by ID with flipped axis and grouping rectangle ------------
 figure_print <- figure_print + 
   ggplot2::coord_flip()
+nickname <- paste0(nickname0, "_groupid_flipped")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Stacked by ID --------------------------------------------------------------
 figure_print <- 
@@ -344,8 +378,10 @@ figure_print <-
   ggplot2::scale_x_continuous(name = "Interview ID", 
                               expand = FALSE) +
   theme_custom() 
+nickname <- paste0(nickname0, "_stackedid")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-### Stacked by fishing experience + ANOVA --------------------------------------
+### Stacked by fishing experience + LM --------------------------------------
 
 # https://steverxd.github.io/Stat_tests/three-or-more-means.html
 # two ways of doing the same thing: anova and lm
@@ -415,6 +451,7 @@ table_raw <- table_raw0 |>
   dplyr::mutate(freq_rel = freq/n_interviews, 
                 fishing_experience0 = paste0(fishing_experience, "\n(", n_interviews, ")"))
 
+# Frequency 
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
@@ -427,7 +464,10 @@ figure_print <-
                             labels = function(x) str_wrap(x, width = 20), 
                             expand = FALSE) +
   theme_custom() 
+nickname <- paste0(nickname0, "_fishexper")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
+# Realitive frequency 
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
@@ -440,8 +480,10 @@ figure_print <-
                             labels = function(x) str_wrap(x, width = 20), 
                             expand = FALSE) +
   theme_custom() 
+nickname <- paste0(nickname0, "_fishexper_rel")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-### Stacked by oral history collection + ANOVA --------------------------------------
+### Stacked by oral history collection + LM --------------------------------------
 # https://steverxd.github.io/Stat_tests/three-or-more-means.html
 # two ways of doing the same thing: anova and lm
 
@@ -530,7 +572,10 @@ figure_print <-
                             labels = function(x) str_wrap(x, width = 20), 
                             expand = FALSE) +
   theme_custom() 
+nickname <- paste0(nickname0, "_collection")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
+# Realitive frequency 
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
@@ -543,5 +588,195 @@ figure_print <-
                             labels = function(x) str_wrap(x, width = 20), 
                             expand = FALSE) +
   theme_custom() 
+nickname <- paste0(nickname0, "_collection_rel")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+
+### Stacked by Indigenous/Not + LM --------------------------------------
+# https://steverxd.github.io/Stat_tests/three-or-more-means.html
+# two ways of doing the same thing: anova and lm
+
+# Does frequency differ by Indigenous identity and by category?
+
+# Anova
+car::Anova(aov(freq ~ indigenous00 + cat, data = table_raw0))
+
+# Anova Table (Type II tests)
+# 
+# Response: freq
+# Sum Sq  Df F value    Pr(>F)    
+# indigenous00  14.70   1  1.8878    0.1721    
+# cat         542.08   4 17.4035 3.591e-11 ***
+#   Residuals   887.72 114                      
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# Linear model
+lm <- lm(freq ~ indigenous00 + cat, data = table_raw0)
+temp <- lm %>% summary() %>% print(digits = 8) # show summary output
+temp 
+# Call:
+#   lm(formula = freq ~ indigenous00 + cat, data = table_raw0)
+# 
+# Residuals:
+#   Min      1Q  Median      3Q     Max 
+# -6.6500 -1.4000 -0.6500  0.9104 14.7250 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)                1.35833    0.62398   2.177   0.0316 *  
+#   indigenous00Non-indigenous  0.70000    0.50948   1.374   0.1721    
+# catCrab                   -0.08333    0.80555  -0.103   0.9178    
+# catFishing                 5.29167    0.80555   6.569 1.57e-09 ***
+#   catNet                    -0.04167    0.80555  -0.052   0.9588    
+# catSalmon                  0.04167    0.80555   0.052   0.9588    
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 2.791 on 114 degrees of freedom
+# Multiple R-squared:  0.3855,	Adjusted R-squared:  0.3585 
+# F-statistic:  14.3 on 5 and 114 DF,  p-value: 7.392e-11
+# 
+# R² = 0.39 → About 39% of variation in frequency is explained by Indigenous identity and category
+# Adjusted R² = 0.36
+# Overall F-test p < 0.001
+# 
+# IN SUMMARY
+# Frequency differed significantly among categories (F₅,₁₁₄ = 14.3, p < 0.001), with the Fishing category exhibiting frequencies approximately 5 units higher than the reference category. No significant differences in frequency were observed between Indigenous and non-Indigenous respondents.
+
+# temp0 <- as.data.frame(temp$coefficients)
+# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
+# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
+
+
+table_raw <- table_raw0 |> 
+  dplyr::group_by(cat, indigenous00) |> 
+  dplyr::summarise(freq = sum(freq, na.rm = TRUE)) |> 
+  dplyr::ungroup() |> 
+  dplyr::left_join(
+    table_raw0 |> 
+      dplyr::select(id, indigenous00) |> 
+      dplyr::distinct() |> 
+      dplyr::group_by(indigenous00) |> 
+      dplyr::summarise(n_interviews = n()) |> 
+      dplyr::ungroup()) |> 
+  dplyr::mutate(freq_rel = freq/n_interviews, 
+                indigenous0 = paste0(indigenous00, "\n(", n_interviews, ")"))
+
+# freq
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = indigenous0, y = freq, fill = cat)) +
+  ggplot2::geom_bar(position="dodge", stat="identity") +
+  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+                             values = colors0) +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_x_discrete(name = "Demographic", 
+                            labels = function(x) str_wrap(x, width = 20), 
+                            expand = FALSE) +
+  theme_custom() 
+nickname <- paste0(nickname0, "_indigenous00")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+# Realitive frequency 
+# figure_print <- 
+#   ggplot2::ggplot(
+#     data = table_raw, 
+#     mapping = aes(x = indigenous00, y = freq, fill = cat)) +
+#   ggplot2::geom_bar(position="dodge", stat="identity") +
+#   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+#                              values = colors0) +
+#   ggplot2::scale_y_continuous(name = "Relative Frequency of Code References") +
+#   ggplot2::scale_x_discrete(name = "Demographic", 
+#                             labels = function(x) str_wrap(x, width = 20), 
+#                             expand = FALSE) +
+#   theme_custom() 
+# nickname <- paste0(nickname0, "_indigenous00_rel")
+# save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+## Figure 3: Hierarchical plot of themes -----------------------------------------------
+#NOT DONE
+
+nickname0 <- "fig-3-hierarchical-themes-manualcode-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
+
+table_raw <- code_references_interviews0[,1:6] 
+names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
+
+table_raw0 <- table_raw <- hier_interviews0
+
+colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+
+### Grouped bar plot by narrator name with grouping rectangle ------------------
+figure_print <- ""
+  
+
+## Figure 4: bar chart of themes -----------------------------------------------
+#NOT DONE
+nickname0 <- "fig-4-bar-themes-manualcode-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
+
+table_raw <- co_occurrence_interviews
+
+colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+
+### Grouped bar plot by narrator name with grouping rectangle ------------------
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = name, y = freq, fill = cat)) +
+  ggplot2::geom_bar(position="dodge", stat="identity") +
+  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+                             values = colors0) +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_x_discrete(name = "Interviewee") +
+  theme_custom() + 
+  ggplot2::theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
+  ) 
+nickname <- paste0(nickname0, "_group_name")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+## Figure 5: bar chart of themes -----------------------------------------------
+#NOT DONE
+
+nickname0 <- "fig-5-sentiment-heatmap-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
+
+table_raw <- sentiment_raw0
+names(table_raw)[2:ncol(table_raw)] <- substr(x = names(table_raw)[2:ncol(table_raw)],start = 3, stop = nchar(names(table_raw)[2:ncol(table_raw)]))
+
+table_raw <- table_raw0 <- table_raw |> 
+  dplyr::mutate(
+    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) ) |> 
+  dplyr::left_join(oralhistory_ref |> 
+                     dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
+  dplyr::select(-x1) |> 
+  tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
+  dplyr::mutate(cat = stringr::str_to_sentence(cat), 
+                cat = gsub(pattern = "_", replacement = " ", x = cat)) 
+
+colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = cat, y = id, fill = cat)) +
+  ggplot2::geom_tile() +
+  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
+                             values = colors0) +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_x_discrete(name = "Interviewee") +
+  theme_custom() + 
+  ggplot2::theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
+  ) 
+nickname <- paste0(nickname0, "_group_name")
+save_figures(figure = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
 
 
