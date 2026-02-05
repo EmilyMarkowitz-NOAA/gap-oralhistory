@@ -40,7 +40,22 @@ fig4 <- fig4 %>%
   scale_fill_viridis() 
 fig4
 
-  
-  
-
-
+# Figure 5: sentiment analysis ------------------------------------------------
+fig5 <- dat_list$sentiment_raw
+colnames(fig5) <- c("interview_name", 
+                    "very negative", 
+                    "moderately negative", 
+                    "moderately positive", 
+                    "very positive")
+fig5$interview <- 1:nrow(fig5)  
+fig5 <- fig5 %>%
+  select(-interview_name) %>%
+  pivot_longer(-interview, names_to = "language", values_to = "frequency") %>%
+  mutate(language = factor(language, levels = c("very negative", 
+                                                "moderately negative",
+                                                "moderately positive", 
+                                                "very positive"))) %>%
+  ggplot(., aes(x = language, y = interview, fill = frequency)) +
+  geom_tile() +
+  scale_fill_viridis(option = "mako", direction = -1)
+fig5
