@@ -1,0 +1,11 @@
+"var1","var","val"
+"crab","boat",2
+"fishing","boat",3
+"fishing","crab",8
+"net","boat",1
+"net","crab",1
+"net","fishing",8
+"salmon","boat",1
+"salmon","crab",0
+"salmon","fishing",3
+"salmon","net",1
