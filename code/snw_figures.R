@@ -1,8 +1,16 @@
 library(here)
-library(purrr)
+library(tidyverse)
 library(readxl)
+library(viridis)
 
-# Read in data -----------------------------------------------------------------
+# Set ggplot theme
+if (!requireNamespace("ggsidekick", quietly = TRUE)) {
+  devtools::install_github("seananderson/ggsidekick")
+}
+library(ggsidekick)
+theme_set(theme_sleek())
+
+# Read in data ----------------------------------------------------------------
 # Read in Em's compiled data
 # dat <- read.csv(here("data", "oralhistory_ref.csv"))  # Error in make.names(col.names, unique = TRUE) : invalid multibyte string 15
 dat_edit <- read.csv(here("data", "oralhistory_ref_edited.csv"))
@@ -16,4 +24,23 @@ dat_list <- file_list %>%
   # set df names to file names, minus extension
   set_names(gsub("\\.xlsx$", "", basename(.))) %>%  
   map(read_xlsx)
+
+
+df1 <- dat_list$code_references_interviews
+
+# Figure 4: co-occurrence of coded themes in interview transcripts ------------
+fig4 <- dat_list$co_occurrence_interviews
+colnames(fig4) <- c("var1", "boat", "crab", "fishing", "net", "salmon")
+fig4$var1 <- c("boat", "crab", "fishing", "net", "salmon")
+fig4 <- fig4 %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "occurrence") %>%
+  mutate(occurrence = as.integer(occurrence)) %>%
+  ggplot(., aes(x = var1, y = var2, fill = occurrence)) +
+  geom_tile() +
+  scale_fill_viridis() 
+fig4
+
+  
+  
+
 
