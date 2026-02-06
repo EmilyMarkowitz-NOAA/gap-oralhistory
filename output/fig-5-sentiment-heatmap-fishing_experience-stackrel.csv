@@ -1,0 +1,25 @@
+"cat","var00","freq","n_interviews","freq_rel","var001"
+"Moderately negative","Commercial",191,7,27.2857142857143,"Commercial
+(7)"
+"Moderately negative","Commercial & Subsistence",189,11,17.1818181818182,"Commercial & Subsistence
+(11)"
+"Moderately negative","Subsistence",132,6,22,"Subsistence
+(6)"
+"Moderately positive","Commercial",212,7,30.2857142857143,"Commercial
+(7)"
+"Moderately positive","Commercial & Subsistence",296,11,26.9090909090909,"Commercial & Subsistence
+(11)"
+"Moderately positive","Subsistence",245,6,40.8333333333333,"Subsistence
+(6)"
+"Very negative","Commercial",112,7,16,"Commercial
+(7)"
+"Very negative","Commercial & Subsistence",163,11,14.8181818181818,"Commercial & Subsistence
+(11)"
+"Very negative","Subsistence",97,6,16.1666666666667,"Subsistence
+(6)"
+"Very positive","Commercial",67,7,9.57142857142857,"Commercial
+(7)"
+"Very positive","Commercial & Subsistence",131,11,11.9090909090909,"Commercial & Subsistence
+(11)"
+"Very positive","Subsistence",75,6,12.5,"Subsistence
+(6)"

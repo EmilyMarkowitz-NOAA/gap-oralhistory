@@ -26,6 +26,11 @@ PKG <- c(
   # Text Management
   "stringr",
   
+  # Network Plots
+  # devtools::install_github("briatte/ggnet")
+  "igraph", 
+  "ggraph", 
+  
   # Spatial mapping
   "sf",
   "ggspatial", 
@@ -101,7 +106,10 @@ theme_custom <- function() {
       panel.background = element_rect(fill = "white", colour = NA), 
       panel.border = element_rect(fill = NA, colour = "grey20"), 
       panel.grid.minor = element_blank(),
-      plot.title = element_text(hjust = 0.5, size = 12), 
+      plot.title = element_text(face = "bold", hjust = 0.5, size = 12), 
+      strip.text = element_text(face = "bold"), 
+      plot.margin=unit(c(0,0,0,0), "cm"), 
+      strip.background = element_rect(fill = "transparent", colour = "white"), 
       legend.text = element_text(size = 8),
       legend.title = element_text(size = 8, face = "bold"),
       legend.background = element_rect(colour = "transparent", 
@@ -110,7 +118,10 @@ theme_custom <- function() {
                                 fill = "transparent"),
       legend.position = "bottom",
       legend.box = "horizontal", 
-      legend.box.spacing = unit(0, "pt")
+      legend.box.spacing = unit(0, "pt"), 
+      
+      axis.text = element_text(face = "bold"), # , size = 12 , family = font0
+      legend.title.position = "top" 
     ) 
 }
 
@@ -197,9 +208,12 @@ save_figures<-function(figure_print,
   save(obj, 
        file = paste0(path, nickname, ".rdata"))
   
+  return(figure_print)
 }
 
-stacked_figures <- function(table_raw0, var00, x_name, nickname0) {
+plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_title) {
+  
+  ## Stacked bar plot-------------------------------  
   
   table_raw <- table_raw0 |> 
     dplyr::rename(var00 = {{var00}}) |> 
@@ -217,53 +231,49 @@ stacked_figures <- function(table_raw0, var00, x_name, nickname0) {
     dplyr::mutate(freq_rel = freq/n_interviews, 
                   var001 = paste0(var00, "\n(", n_interviews, ")"))
   
-  figure_print <- 
+  ### frequency bar plot ---------------------------------------------
+  figure_print <- figure_print_norel <- 
     ggplot2::ggplot(
       data = table_raw, 
       mapping = aes(x = var001, y = freq, fill = cat)) +
     ggplot2::geom_bar(position="dodge", stat="identity") +
-    ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
-                               values = colors0) +
-    ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+    ggplot2::scale_fill_viridis_d(
+      name = "Theme", 
+                               option = "E", 
+                               begin = .2, 
+                               end = .8, 
+                               direction = -1) +
+    ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+                                expand = expand_custom) +
     ggplot2::scale_x_discrete(name = x_name, 
                               labels = function(x) str_wrap(x, width = 20), 
-                              expand = FALSE) +
+                              expand = expand_custom) +
     theme_custom() 
-  nickname <- paste0(nickname0, var00)
+  nickname <- paste0(nickname0, var00, "-stack")
   save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
   
-  
-  # Realitive frequency 
-  figure_print <- 
+  ### Realitive frequency bar plot ---------------------------------------------
+  figure_print <- figure_print_rel <- 
     ggplot2::ggplot(
       data = table_raw, 
       mapping = aes(x = var00, y = freq_rel, fill = cat)) +
     ggplot2::geom_bar(position="dodge", stat="identity") +
-    ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
-                               values = colors0) +
-    ggplot2::scale_y_continuous(name = "Relative Frequency of Code References") +
+    ggplot2::scale_fill_viridis_d(
+      name = "Theme", 
+      option = "E", 
+      begin = .2, 
+      end = .8, 
+      direction = -1) +
+    ggplot2::scale_y_continuous(name = "Relative Frequency of Code References", 
+                                expand = expand_custom) +
     ggplot2::scale_x_discrete(name = x_name, 
                               labels = function(x) str_wrap(x, width = 20), 
-                              expand = FALSE) +
+                              expand = expand_custom) +
     theme_custom() 
-  nickname <- paste0(nickname0, var00, "-rel")
+  nickname <- paste0(nickname0, var00, "-stackrel")
   save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-  table_raw1 <- table_raw0 |> 
-    dplyr::rename(var00 = {{var00}})
-  lm <- lm(freq ~ var00 + cat + (1 | id), data = table_raw1)
-  temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-  
-  return(list("figure_print" = figure_print, "lm_results" = temp)) 
-  
-  }
-
-plot_pca <- function(table_raw0, var00, legend_title = "") {
-  
-  # Example PCA Summary to Annotate the Plot
-  # Principal component analysis (PCA) was performed on frequency values across categories for each participant (id). The first two principal components (PC1 and PC2) explain X% and Y% of the variance, respectively. PC1 captures the overall differences in frequencies across categories, while PC2 captures contrasting patterns among the categories. Points are colored by indigenous00 status, and the shaded ellipses indicate the general distribution (“cloud”) of each group. Non-Indigenous and Indigenous respondents show partial separation along PC1, suggesting some group-level differences in frequency patterns.
-  
-  
+  ## PCA -------------------------------  
   # 1. Reshape data to wide format (one row per ID, columns = categories)
   table_raw <- table_raw0 |> 
     dplyr::rename(var00 = {{var00}}) |> 
@@ -286,14 +296,17 @@ plot_pca <- function(table_raw0, var00, legend_title = "") {
   # 4. Make PCA scatter plot colored by indigenous00
   colors0 <- viridis::mako(length(unique(table_raw$var00)), direction = -1, begin = 0.2, end = .8)
   
-  figure_print <- ggplot2::ggplot(table_raw, 
+  figure_print <- figure_print_pca <- 
+    ggplot2::ggplot(table_raw, 
                                   aes(x = PC1, y = PC2, color = var00, fill = var00)) +
-    ggplot2::stat_ellipse(alpha = 0.2, geom = "polygon", color = NA) +  # semi-transparent cloud
-    ggplot2::geom_point(size = 3) +
+    ggplot2::stat_ellipse(alpha = 0.1, # , color = NA
+                          geom = "polygon") +  # semi-transparent cloud
+    ggplot2::geom_point(size = 3, 
+                        alpha = 0.8) +
     ggplot2::theme_minimal() +
-    ggplot2::scale_fill_manual(name = legend_title, # "Temperature",
+    ggplot2::scale_fill_manual(name = x_name,
                                values = colors0) +
-    ggplot2::scale_color_manual(name = legend_title, # "Temperature",
+    ggplot2::scale_color_manual(name = x_name, 
                                 values = colors0) +
     ggplot2::labs(
       x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
@@ -303,106 +316,168 @@ plot_pca <- function(table_raw0, var00, legend_title = "") {
     theme_custom() 
   nickname <- paste0(nickname0, var00, "-pca")
   save_figures(figure_print = figure_print, table_raw = pca_res, nickname = nickname, width = width0, height = height0)
+
+  # ## Box and Whisker ---------------
+  # 
+  # figure_print <- figure_print_boxw <- 
+  #   ggplot2::ggplot(
+  #     data = table_raw, 
+  #     mapping = aes(x = var001, y = freq, fill = cat)) +
+  #   geom_boxplot(notch = TRUE) +
+  #   ggplot2::scale_fill_viridis_d(
+  #     name = "Theme", 
+  #     option = "E", 
+  #     begin = .2, 
+  #     end = .8, 
+  #     direction = -1) +
+  #   ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+  #                               expand = expand_custom) +
+  #   ggplot2::scale_x_discrete(name = x_name, 
+  #                             labels = function(x) str_wrap(x, width = 20), 
+  #                             expand = expand_custom) +
+  #   theme_custom() 
+  # nickname <- paste0(nickname0, var00)
+  # save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
   
-  save(pca_res, file = paste0("./output/", nickname, ".rdata"))
+  # https://steverxd.github.io/Stat_tests/three-or-more-means.html
+  # two ways of doing the same thing: anova and lm
   
+  # Anova
+  table_aov <- car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
   
-  table_raw1 <- table_raw0 |> 
+  # Linear Regression
+  table_lm <- table_raw0 |> 
     dplyr::rename(var00 = {{var00}})
-  lm <- lm(freq ~ var00 + cat + (1 | id), data = table_raw1)
-  temp <- lm %>% summary() %>% print(digits = 8) # show summary output
+  lm <- lm(freq ~ var00 + cat + (1 | id), data = table_lm)
+  table_lm <- lm %>% summary() %>% print(digits = 8) # show summary output
   
+  # temp0 <- as.data.frame(temp$coefficients)
+  # rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
+  # rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
+  
+  return(list("figure_print_rel" = figure_print_rel, 
+  "figure_print" = figure_print_norel, 
+  "figure_print_pca" = figure_print_pca, 
+              "lm_results" = table_lm, 
+              "anova" = table_aov)) 
+  
+  }
+
+
+plot_tileheat <- function(table_raw0, facet_var = NULL) {
+
+  table_raw <- table_raw0 |> 
+    dplyr::mutate(cat0 = dplyr::case_when(
+      cat == "Moderately negative" ~ " -",
+      cat == "Very negative" ~ "--",
+      cat == "Moderately positive" ~ " +",
+      cat == "Very positive" ~ "++"
+    )) |> 
+    dplyr::mutate(cat0 = factor(x = cat0, 
+                                levels = c("++", " +", " -", "--"), 
+                                labels = c("++", " +", " -", "--"),
+                                ordered = TRUE))
+  
+  temp <- table_raw |> 
+    dplyr::group_by(cat0) |> 
+    dplyr::summarise(mean = mean(freq, na.rm = TRUE), 
+                     n = n(), 
+                     sd = sd(freq, na.rm = TRUE)) |> 
+    dplyr::ungroup() |> 
+    dplyr::mutate(
+      across(where(is.numeric), round, digits = 1), 
+      facet_var1 = paste0(cat0, ": ", 
+                          "x̄=",mean,", sd=",sd,", n=",n))
+      
+  if (!is.null(facet_var)) {
+    temp <- table_raw |> 
+      dplyr::rename(facet_var = {{facet_var}}) |> 
+      dplyr::group_by(facet_var, cat0) |> 
+      dplyr::summarise(mean = mean(freq, na.rm = TRUE), 
+                       n = n(), 
+                       sd = sd(freq, na.rm = TRUE)) |> 
+      dplyr::ungroup() |> 
+      dplyr::mutate(
+        across(where(is.numeric), round, digits = 1), 
+        str0 = paste0(cat0, ifelse(n==1, "", paste0(": x̄=",mean,", sd=",sd)))) #,", n=",)
+    
+    temp <- temp |> 
+      dplyr::group_by(facet_var) |> 
+      dplyr::summarise(str0 = paste0(str0, collapse = "\n"), 
+                       n = mean(n)) |> 
+      dplyr::ungroup() |> 
+      dplyr::mutate(facet_var1 = paste0(facet_var, " (", n, ")\n", str0))
+    
+    table_raw <- table_raw |> 
+      dplyr::rename(facet_var = {{facet_var}}) |> 
+      dplyr::left_join(temp) |> 
+      dplyr::mutate(facet_var = facet_var1)
+  }
+  
+  figure_print <- 
+    ggplot2::ggplot(
+      data = table_raw |> dplyr::mutate(id = factor(id, ordered = TRUE)), 
+      mapping = aes(x = cat, y = id, fill = freq)) +
+    ggplot2::geom_tile() +
+    ggplot2::geom_text(aes(label = freq)) + 
+    ggplot2::scale_fill_viridis_c(
+      name = "Frequency", 
+      option = "E", 
+      begin = .2, 
+      end = .8, 
+      direction = -1, 
+      breaks = scales::pretty_breaks(n = 10),  # create ~10 nicely spaced breaks
+      guide = ggplot2::guide_colorbar(
+        # draw.lim = TRUE, 
+        barwidth = ggplot2::unit(10, "cm")  # increase the height of the color bar
+      )) +
+    ggplot2::scale_x_discrete(
+      name = "Sentiment", 
+      expand = expand_custom, 
+      labels = function(x) str_wrap(x, width = 10)) + 
+    ggplot2::scale_y_discrete(
+      expand = expand_custom, 
+      name = "Interview ID") +
+    ggplot2::theme_void() + 
+    theme_custom() + 
+    ggplot2::theme(
+      panel.border = element_blank(),
+      panel.grid = element_blank()
+    )
+  
+  nickname <- paste0(nickname0, "_heatmap")
+  if (!is.null(facet_var)) {
+    figure_print <- 
+      figure_print + 
+      ggplot2::facet_wrap(vars(facet_var), scales = "free_y")
+    nickname <- paste0(nickname, "_facet_", facet_var)
+  } else {
+    figure_print <- figure_print +
+      ggplot2::ggtitle(label = "All Oral Histories", 
+                       subtitle = temp$facet_var1)
+  }
   return(list(
-              "figure_print" = figure_print, 
-              "pca_res" = pca_res, 
-              "table_raw" = table_raw, 
-              "lm_results" = temp))
+    "figure_print" = figure_print, 
+    "stats" = temp))
+  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 }
+
 
 # Prep figures -----------------------------------------------------------------
 
+## NOTES ------
+
+# Color choices begin = 0.2, end = 0.8
+### G/mako - Themes
+### E/cviridis - Counts/Frequencies
+
+expand_custom <- c(.005, .005)
+
 ## Figure 1: Hierarchical plot of themes -----------------------------------------------
-#NOT DONE
+
+# TOLDEO - NOT POSSIBLE TO COMPLETE
+
 nickname0 <- "fig-1-hierarchical-themes-auto-"
-height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-width0 <- full_page_portrait_width
-
-table_raw <- code_references_interviews0[,1:6] 
-names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
-
-table_raw0 <- table_raw <- hier_interviews0
-
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
-
-### Grouped bar plot by narrator name with grouping rectangle ------------------
-figure_print <- 
-  ggplot2::ggplot(
-    data = table_raw, 
-    mapping = aes(x = name, y = freq, fill = cat)) +
-  ggplot2::geom_bar(position="dodge", stat="identity") +
-  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
-                             values = colors0) +
-  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
-  ggplot2::scale_x_discrete(name = "Interviewee") +
-  theme_custom() + 
-  ggplot2::theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
-  ) 
-nickname <- paste0(nickname0, "_group_name")
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
-nickname0 <- "fig-1-bar-themes-auto-"
-height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-width0 <- full_page_portrait_width
-
-table_raw <- code_references_interviews0[,1:6] 
-names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
-
-table_raw0 <- table_raw <- table_raw|> 
-  dplyr::mutate(
-    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) # , 
-    # name = substr(x = x1, start = 12, stop = nchar(x1)), 
-    # name = gsub(pattern = "\\\\", replacement = "", x = name), 
-    # name = gsub(pattern = "_", replacement = " ", x = name), 
-    # name = gsub(pattern = "-", replacement = " ", x = name), 
-    # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
-    # name = stringr::str_to_title(name)
-  ) |> 
-  dplyr::left_join(oralhistory_ref |> 
-                     dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
-  dplyr::select(-x1) |> 
-  tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_sentence(cat))
-
-table_raw_rect <- table_raw |> 
-  dplyr::select(id) |>
-  dplyr::distinct() |> 
-  dplyr::mutate(
-    xmin = id - 0.45, # approx start of group
-    xmax = id + 0.45,  # approx end of group
-    ymin = 0, 
-    ymax = max(table_raw$freq)
-  )
-
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
-
-### Grouped bar plot by narrator name with grouping rectangle ------------------
-figure_print <- 
-  ggplot2::ggplot(
-    data = table_raw, 
-    mapping = aes(x = name, y = freq, fill = cat)) +
-  ggplot2::geom_bar(position="dodge", stat="identity") +
-  ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
-                             values = colors0) +
-  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
-  ggplot2::scale_x_discrete(name = "Interviewee") +
-  theme_custom() + 
-  ggplot2::theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
-  ) 
-nickname <- paste0(nickname0, "_group_name")
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
 
 ## Figure 2: bar chart of themes -----------------------------------------------
 
@@ -427,7 +502,7 @@ table_raw0 <- table_raw <- table_raw |>
                      dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
   dplyr::select(-x1) |> 
   tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_sentence(cat))
+  dplyr::mutate(cat = stringr::str_to_title(cat))
 
 table_raw_rect <- table_raw |> 
   dplyr::select(id) |>
@@ -449,8 +524,10 @@ figure_print <-
   ggplot2::geom_bar(position="dodge", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
-  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
-  ggplot2::scale_x_discrete(name = "Interviewee") +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+                              expand = expand_custom) +
+  ggplot2::scale_x_discrete(name = "Interviewee", 
+                            expand = expand_custom) +
   theme_custom() + 
   ggplot2::theme(
     axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1) 
@@ -466,9 +543,10 @@ figure_print <-
   ggplot2::geom_bar(position="dodge", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
-  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+                              expand = expand_custom) +
   ggplot2::scale_x_continuous(name = "Interview ID", 
-                              expand = FALSE) +
+                              expand = expand_custom) +
   theme_custom()  + 
   ggplot2::geom_rect(
     data = table_raw_rect,
@@ -494,22 +572,29 @@ figure_print <-
   ggplot2::geom_bar(position="stack", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
-  ggplot2::scale_y_continuous(name = "Frequency of Code References") +
+  ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+                              expand = expand_custom) +
   ggplot2::scale_x_continuous(name = "Interview ID", 
-                              expand = FALSE) +
+                              expand = expand_custom) +
   theme_custom() 
 nickname <- paste0(nickname0, "_stackedid")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-### Stacked by fishing experience + LM --------------------------------------
+### pca/lm/Stacked by fishing experience -----------------------------------------
 
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
+# Does frequency differ by fishing experiance and by category?
 
-# Anova
-car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
+temp <- plot_lm_pca_stacked(
+  table_raw0 = table_raw0, 
+  var00 = "fishing_experience", 
+  x_name = "Fishing Experiance", 
+  nickname0 = nickname0) 
 
-# Anova Table (Type II tests)
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
+
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq  Df F value    Pr(>F)    
@@ -519,10 +604,7 @@ car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
-lm <- lm(freq ~ fishing_experience + cat, data = table_raw0)
-temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-temp 
+### Linear model
 # Call:
 #   lm(formula = freq ~ fishing_experience + cat, data = table_raw0)
 # 
@@ -553,24 +635,21 @@ temp
 # IN SUMMARY
 # Frequency differed significantly among categories (F₆,₁₁₃ = 11.6, p < 0.001), with the Fishing category reporting frequencies approximately 5 units higher than the reference category. Fishing experience was not a significant predictor of frequency.
 
-# temp0 <- as.data.frame(temp$coefficients)
-# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
-# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
+### pca/lm/Stacked by oral history collection --------------------------------------
 
-stacked_figures(
+# Does frequency differ by Oral History Collection and by category?
+
+plot_lm_pca_stacked(
   table_raw0 = table_raw0, 
-  var00 = "fishing_experience", 
-  x_name = "Fishing Experiance", 
+  var00 = "collection", 
+  x_name = "Oral History Collection", 
   nickname0 = nickname0) 
 
-### Stacked by oral history collection + LM --------------------------------------
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
 
-# Anova
-car::Anova(aov(freq ~ collection + cat, data = table_raw0))
-
-# Anova Table (Type II tests)
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq  Df F value    Pr(>F)    
@@ -580,10 +659,7 @@ car::Anova(aov(freq ~ collection + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
-lm <- lm(freq ~ collection + cat, data = table_raw0)
-temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-temp 
+### Linear model
 # Call:
 #   lm(formula = freq ~ collection + cat, data = table_raw0)
 # 
@@ -621,26 +697,21 @@ temp
 # IN SUMMARY
 # Frequency differed significantly among categories (F₇,₁₁₂ = 10.3, p < 0.001), with the Fishing category exhibiting frequencies approximately 5 units higher than the reference category. Differences among collections were not statistically significant, although West Side Stories showed a marginally higher frequency.
 
-# temp0 <- as.data.frame(temp$coefficients)
-# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
-# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
-
-stacked_figures(
-  table_raw0 = table_raw0, 
-  var00 = "collection", 
-  x_name = "Oral History Collection", 
-  nickname0 = nickname0) 
-
-### Stacked by Indigenous/Not + LM --------------------------------------
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
+### pca/lm/Stacked by Indigenous/Not ---------------------------------------------
 
 # Does frequency differ by Indigenous identity and by category?
 
-# Anova
-car::Anova(aov(freq ~ indigenous00 + cat, data = table_raw0))
+plot_lm_pca_stacked(
+  table_raw0 = table_raw0, 
+  var00 = "indigenous00", 
+  x_name = "Indigenous Status", 
+  nickname0 = nickname0) 
 
-# Anova Table (Type II tests)
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
+
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq  Df F value    Pr(>F)    
@@ -650,10 +721,7 @@ car::Anova(aov(freq ~ indigenous00 + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
-lm <- lm(freq ~ indigenous00 + cat, data = table_raw0)
-temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-temp 
+### Linear model
 # Call:
 #   lm(formula = freq ~ indigenous00 + cat, data = table_raw0)
 # 
@@ -683,36 +751,42 @@ temp
 # IN SUMMARY
 # Frequency differed significantly among categories (F₅,₁₁₄ = 14.3, p < 0.001), with the Fishing category exhibiting frequencies approximately 5 units higher than the reference category. No significant differences in frequency were observed between Indigenous and non-Indigenous respondents.
 
-# temp0 <- as.data.frame(temp$coefficients)
-# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
-# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
-
-
-stacked_figures(
-  table_raw0 = table_raw0, 
-  var00 = "indigenous00", 
-  x_name = "Demographic", 
-  nickname0 = nickname0) 
-
 ## Figure 3: Hierarchical plot of themes -----------------------------------------------
-#NOT DONE
+#NOT POSSIBLE TO RECREATE, this is a plot of what we've got
 
 nickname0 <- "fig-3-hierarchical-themes-manualcode-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-table_raw <- code_references_interviews0[,1:6] 
-names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
+table_raw <- themes_notesonly0[,-1]
+names(table_raw) <- substr(x = names(table_raw),start = 3, stop = nchar(names(table_raw)))
 
-table_raw0 <- table_raw <- hier_interviews0
+table_raw0 <- table_raw <- table_raw |>
+  # dplyr::select(-x1) |> 
+  tidyr::pivot_longer(names_to = "var", values_to = "val", cols = names(table_raw)) |> 
+  dplyr::mutate(var = gsub(x = var, pattern = "_", replacement = " "), 
+                var = stringr::str_to_title(var))
 
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
-
-### Grouped bar plot by narrator name with grouping rectangle ------------------
-figure_print <- ""
+### Bar plot of theme ------------------
+colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = var, y = val, fill = var)) +
+  ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
+  ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
+                             values = colors0, 
+                             expand = expand_custom) +
+  ggplot2::scale_y_continuous(name = "Coded Themes from Research Notes", 
+                              breaks = scales::pretty_breaks(), 
+                              expand = expand_custom) +
+  ggplot2::scale_x_discrete(name = "Themes") +
+  theme_custom() 
+nickname <- paste0(nickname0)
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ## Figure 4: bar chart of themes -----------------------------------------------
-#NOT DONE
+
 nickname0 <- "fig-4-bar-themes-manualcode-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
@@ -735,7 +809,9 @@ table_raw <- table_raw |>
   dplyr::rename(var1 = x1) |> 
   dplyr::filter(!is.na(val)) |>
   dplyr::mutate(val = as.numeric(val)) |>
-  dplyr::right_join(comb)
+  dplyr::right_join(comb) |> 
+  dplyr::mutate(var = stringr::str_to_title(var), 
+                var1 = stringr::str_to_title(var1))
 
 ### Grouped bar plot by co-theme ------------------
 colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
@@ -743,73 +819,105 @@ figure_print <-
   ggplot2::ggplot(
     data = table_raw, 
     mapping = aes(x = var, y = val, fill = var1)) +
-  ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single")) + 
+# ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
   ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
                              values = colors0) +
   ggplot2::scale_y_continuous(name = "Number of Co-occurrences Across Transcripts", 
-                              breaks = scales::pretty_breaks()) +
-  ggplot2::scale_x_discrete(name = "Themes") +
+                              breaks = scales::pretty_breaks(), 
+                              expand = expand_custom) +
+  ggplot2::scale_x_discrete(name = "Themes", 
+                            expand = expand_custom) +
   theme_custom() 
 nickname <- paste0(nickname0, "_group_name")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Tile plot by co-theme ------------------
-colors0 <- viridis::mako(length(unique(table_raw$val)), begin = 0.2, end = .8)
+colors0 <- c("grey80", 
+             viridis::cividis(n = length(1:max(table_raw$val)), 
+                              begin = 0.2, end = .8, direction = -1))
+# breaks = min(table_raw):max(table_raw), 
+
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
+    # data = table_raw |> dplyr::mutate(val = ifelse(val == 0, NA, val)), 
     mapping = aes(x = var, y = var1, fill = val)) +
   ggplot2::geom_tile() +
   ggplot2::geom_text(aes(label = val)) + 
+  ggplot2::scale_fill_continuous(
+    name = "Co-occurrences Count",
+    palette = colors0, 
+    breaks = 0:max(table_raw$val)
+  ) +
+  # ggplot2::scale_fill_viridis_b(
+  #   name = "Co-occurrences Count", 
+  #   begin = .2, 
+  #   end = .8, 
+  #   na.value = "white", 
+  #   breaks = 1:max(table_raw$val),
+  #   option = "E") + 
   ggplot2::guides(fill = guide_coloursteps(
-    even.steps = TRUE, 
-    title = "Co-occurrences\nCount")) + 
+    even.steps = FALSE,
+    show.limits = TRUE, 
+    barwidth = ggplot2::unit(10, "cm"))) +  # increase the height of the color bar)) + 
   ggplot2::theme_void() +
-  ggplot2::scale_y_discrete(name = "Co-occured Themes") +
-  ggplot2::scale_x_discrete(name = "Co-occured Themes") +
+  # ggplot2::theme_minimal() +
+  ggplot2::scale_y_discrete(
+    expand = expand_custom, 
+    name = "", 
+    # name = "Co-occured Themes"
+    ) +
+  ggplot2::scale_x_discrete(
+    expand = expand_custom, 
+    name = "", 
+    # name = "Co-occured Themes", 
+    position = "top") +
   theme_custom() +
-  ggplot2::theme(legend.direction = "horizontal", 
+  ggplot2::theme(
+    panel.grid = element_blank(), 
+    panel.border = element_blank(), 
+    axis.ticks = element_blank(), 
+    legend.direction = "horizontal", 
+    legend.title.position = "top", 
+    axis.text.y = element_text(angle = 90, hjust = 1, vjust = 1),
                  legend.position = c(0.6, 0.1))
 nickname <- paste0(nickname0, "_tile")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
+### Tile plot by co-theme no legned------------------
+figure_print <- 
+  figure_print +
+  ggplot2::scale_x_discrete(
+    expand = expand_custom, 
+    name = "Co-occurrences Count", 
+    # name = "Co-occured Themes", 
+    position = "top") +
+  ggplot2::theme(
+    legend.position = "none")
+nickname <- paste0(nickname0, "_tilenolegend")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Network plot by co-theme ------------------
-# devtools::install_github("briatte/ggnet")
-# library(ggnet)
-# library(network)
-# library(sna)
-# library(ggplot2)
-# library(igraph)
-# library(GGally)
-# library(intergraph)
 
-# packages
-library(dplyr)
-library(tidyr)
-library(igraph)
-library(ggraph)
-library(ggplot2)
-library(scales)
-
-# 1️⃣ edges with val
+# edges with val
 edges <- table_raw |>
   dplyr::select(var1, var, val)
 
-# 2️⃣ nodes with size = total val (node strength)
+# nodes with size = total val (node strength)
 nodes <- table_raw |>
   tidyr::pivot_longer(cols = c(var1, var), values_to = "node") |>
   dplyr::group_by(node) |>
   dplyr::summarise(size = sum(val), .groups = "drop")
 
-# 3️⃣ build igraph
+# build igraph
 g <- igraph::graph_from_data_frame(
   d = edges,
   vertices = nodes,
   directed = FALSE
 )
 
-# 4️⃣ network plot with only edge thickness
+# network plot with only edge thickness
 figure_print <- 
   ggraph(g, layout = "fr") +   # force-directed layout
   ggraph::geom_edge_fan(
@@ -829,7 +937,7 @@ figure_print <-
     label.r = ggplot2::unit(0, "lines")        # rounded corners
   ) +
   ggraph::scale_edge_width(
-    range = c(0.5, 3),
+    range = c(0.5, 4),
     name = "Co-occurrence Count",
     guide = "legend"
   ) +
@@ -851,12 +959,11 @@ figure_print <-
 
 ## Node Strength: 
 # Node strength represents the total connection weight of a node, calculated by summing the values of all edges linked to it. It highlights how strongly a node is connected in the network, with higher values indicating more or stronger connections, and complements other metrics like degree and centrality.
+
 nickname <- paste0(nickname0, "_network")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-
 ## Figure 5: bar chart of themes -----------------------------------------------
-#NOT DONE
 
 nickname0 <- "fig-5-sentiment-heatmap-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
@@ -872,51 +979,38 @@ table_raw <- table_raw0 <- table_raw |>
                      dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
   dplyr::select(-x1) |> 
   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_sentence(cat), 
+  dplyr::mutate(cat = stringr::str_to_title(cat), 
                 cat = gsub(pattern = "_", replacement = " ", x = cat)) 
 
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+### Tile map -------------------------------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, facet_var = NULL)
 
-### sentiment heat map ------------------
-figure_print <- 
-  ggplot2::ggplot(
-    data = table_raw, 
-    mapping = aes(x = cat, y = id, fill = freq)) +
-  ggplot2::geom_tile() +
-  ggplot2::geom_text(aes(label = freq)) + 
-  ggplot2::scale_fill_continuous(
-    name = "Frequency", 
-    breaks = scales::pretty_breaks(n = 10),  # create ~10 nicely spaced breaks
-    guide = ggplot2::guide_colorbar(
-      barwidth = ggplot2::unit(10, "cm")  # increase the height of the color bar
-    )) +
-  ggplot2::scale_x_discrete(
-    name = "Sentiment", 
-    labels = function(x) str_wrap(x, width = 10)) + 
-  ggplot2::scale_y_continuous(
-    name = "Interview ID", 
-    breaks = scales::pretty_breaks(n = 12)) +
-  ggplot2::theme_void() + 
-  theme_custom() + 
-  ggplot2::theme(
-    panel.border = element_blank(),
-    panel.grid = element_blank()#, 
-    # axis.line = element_blank()
-    # axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
-  )
+### Tile facet by indigenous00 -------------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, facet_var = "indigenous00")
 
-nickname <- paste0(nickname0, "_heatmap")
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+### Tile facet by oral history collection --------------------------------------
+plot_tileheat(table_raw0 = table_raw0, facet_var = "collection")
 
-### Stacked by fishing experience + LM --------------------------------------
+### Tile facet fishing experience  ---------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, facet_var = "fishing_experience")
 
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
+### pca/lm/Stacked by fishing experiance -----------------------------------------
 
-# Anova
-car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
+# Q: How does frequency vary by fishing experience and by some categorical attitude/assessment (cat with levels like “Moderately positive”, “Very negative”, “Very positive”)?
 
-# Anova Table (Type II tests)
+plot_lm_pca_stacked(
+  table_raw0 = table_raw0, 
+  var00 = "fishing_experience", 
+  x_name = "Fishing Experiance", 
+  nickname0 = nickname0) 
+
+# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Fishing experience (var00) did not significantly predict frequency.
+
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
+
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq Df F value    Pr(>F)    
@@ -926,7 +1020,7 @@ car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
+### Linear model
 # lm <- lm(freq ~ fishing_experience + cat, data = table_raw0)
 # temp <- lm %>% summary() %>% print(digits = 8) # show summary output
 # temp 
@@ -957,7 +1051,6 @@ car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
 # F-statistic p < 0.001 → The model as a whole is meaningful (mostly because of catFishing).
 
 # IN SUMMARY
-# Q: How does frequency vary by fishing experience and by some categorical attitude/assessment (cat with levels like “Moderately positive”, “Very negative”, “Very positive”)?
 # Differences in frequency by fishing experience are not statistically significant. After accounting for category, Commercial/Subsistence fishers report slightly lower frequency, and Subsistence slightly higher, but these are small and noisy.
 # After accounting for category, Commercial/Subsistence fishers report slightly lower frequency, and Subsistence slightly higher, but these are small and noisy.
 # Frequency differed significantly across categories (F₅,₉₀ = 7.66, p < 0.001). Respondents in the Moderately positive category reported frequencies approximately 10 units higher than the reference group, while those in the Very positive category reported frequencies approximately 10 units lower. Fishing experience was not a significant predictor of frequency.
@@ -968,24 +1061,24 @@ car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
 # 
 # The effect of category is directional and interpretable in absolute units (~±10)
 
-# temp0 <- as.data.frame(temp$coefficients)
-# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
-# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
 
-stacked_figures(
+### pca/lm/Stacked by oral history collection --------------------------------------
+
+# Q: Does frequency vary by collection and by category?
+
+plot_lm_pca_stacked(
   table_raw0 = table_raw0, 
-  var00 = "fishing_experience", 
-  x_name = "Fishing Experiance", 
+  var00 = "collection", 
+  x_name = "Oral History Collection", 
   nickname0 = nickname0) 
 
-### Stacked by oral history collection + LM --------------------------------------
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
 
-# Anova
-car::Anova(aov(freq ~ collection + cat, data = table_raw0))
+# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Differences among collections (var00) were generally not significant, though the Women in Alaska Fisheries collection showed a marginally lower frequency.
 
-# Anova Table (Type II tests)
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq Df F value    Pr(>F)    
@@ -995,10 +1088,7 @@ car::Anova(aov(freq ~ collection + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
-lm <- lm(freq ~ collection + cat, data = table_raw0)
-temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-temp
+### Linear model
 # Call:
 #   lm(formula = freq ~ collection + cat, data = table_raw0)
 # 
@@ -1037,27 +1127,25 @@ temp
 # 
 # Overall, results are consistent: attitude category drives frequency, demographic/collection variables matter less
 
-# Q: Does frequency vary by collection and by category?
-
 # Paper sentence:
 # Frequency differed significantly across categories (F₆,₈₉ = 6.56, p < 0.001), with respondents in the Moderately positive category reporting approximately 10 units higher frequency than the reference group, and those in the Very positive category reporting approximately 10 units lower. Differences among collections were mostly non-significant, with a marginally lower frequency observed for the Women in Alaska Fisheries collection.
   
-stacked_figures(
+### pca/lm/Stacked by Indigenous/Not --------------------------------------
+
+# Q: Does frequency differ by Indigenous identity and by category?
+
+plot_lm_pca_stacked(
   table_raw0 = table_raw0, 
-  var00 = "collection", 
-  x_name = "Oral History Collection", 
+  var00 = "indigenous00", 
+  x_name = "Indigenous Status", 
   nickname0 = nickname0) 
-  
-### Stacked by Indigenous/Not + LM --------------------------------------
-# https://steverxd.github.io/Stat_tests/three-or-more-means.html
-# two ways of doing the same thing: anova and lm
 
-# Does frequency differ by Indigenous identity and by category?
+temp$figure_print
+temp$figure_print_rel
+temp$figure_print_pca
+# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Additionally, non-Indigenous respondents reported frequencies about 5.5 units higher than Indigenous respondents.
 
-# Anova
-car::Anova(aov(freq ~ indigenous00 + cat, data = table_raw0))
-
-# Anova Table (Type II tests)
+### Anova Table (Type II tests)
 # 
 # Response: freq
 # Sum Sq Df F value    Pr(>F)    
@@ -1067,11 +1155,7 @@ car::Anova(aov(freq ~ indigenous00 + cat, data = table_raw0))
 # ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-# Linear model
-lm <- lm(freq ~ indigenous00 + cat, data = table_raw0)
-temp <- lm %>% summary() %>% print(digits = 8) # show summary output
-temp 
-
+### Linear model
 # Call:
 #   lm(formula = freq ~ indigenous00 + cat, data = table_raw0)
 # 
@@ -1108,73 +1192,187 @@ temp
 # Paper sentence:
 # Frequency differed significantly by category and Indigenous identity (F₄,₉₁ = 10.35, p < 0.001). Respondents in the Moderately positive category reported approximately 10 units higher frequency, while those in the Very positive category reported approximately 10 units lower than the reference group. Additionally, non-Indigenous respondents reported frequencies about 5.5 units higher than Indigenous respondents.
 
-# temp0 <- as.data.frame(temp$coefficients)
-# rownames(temp0)[rownames(temp0) == "(Intercept)"] <- "fishing_experienceCommerical"
-# rownames(temp0)[temp0$`Pr(>|t|)` < 0.05]
 
-stacked_figures(
-  table_raw0 = table_raw0, 
-  var00 = "indigenous00", 
-  x_name = "Demographic", 
-  nickname0 = nickname0) 
+# ## Figure 6: Hierarchical plot of auto themes -----------------------------------------------
+# #NOT DONE
+# 
+# nickname0 <- "fig-6-hierarchical-themes-autocode-"
+# height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+# width0 <- full_page_portrait_width
+# 
+# table_raw <- sentiment_raw0 
+# names(table_raw)[2:ncol(table_raw)] <- substr(x = names(table_raw)[2:ncol(table_raw)],start = 3, stop = nchar(names(table_raw)[2:ncol(table_raw)]))
+# 
+# table_raw0 <- table_raw <- table_raw |> 
+#   dplyr::mutate(
+#     id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) # , 
+#     # name = substr(x = x1, start = 12, stop = nchar(x1)), 
+#     # name = gsub(pattern = "\\\\", replacement = "", x = name), 
+#     # name = gsub(pattern = "_", replacement = " ", x = name), 
+#     # name = gsub(pattern = "-", replacement = " ", x = name), 
+#     # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
+#     # name = stringr::str_to_title(name)
+#   ) |> 
+#   dplyr::left_join(oralhistory_ref |>
+#                      dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
+#   dplyr::select(-x1) |>
+#   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
+#   dplyr::mutate(cat = stringr::str_to_sentence(cat))
+# 
+# colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+# 
+### Grouped bar plot by narrator name with grouping rectangle ------------------
+# figure_print <- ""
 
-## Figure 6: Hierarchical plot of auto themes -----------------------------------------------
-#NOT DONE
 
-nickname0 <- "fig-6-hierarchical-themes-autocode-"
+# Figure 7: Map of Oral Histories -----------------------------------------------
+
+nickname0 <- "fig-7-map-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-table_raw <- sentiment_raw0 
-names(table_raw)[2:ncol(table_raw)] <- substr(x = names(table_raw)[2:ncol(table_raw)],start = 3, stop = nchar(names(table_raw)[2:ncol(table_raw)]))
 
-table_raw0 <- table_raw <- table_raw |> 
-  dplyr::mutate(
-    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) # , 
-    # name = substr(x = x1, start = 12, stop = nchar(x1)), 
-    # name = gsub(pattern = "\\\\", replacement = "", x = name), 
-    # name = gsub(pattern = "_", replacement = " ", x = name), 
-    # name = gsub(pattern = "-", replacement = " ", x = name), 
-    # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
-    # name = stringr::str_to_title(name)
-  ) |> 
-  dplyr::left_join(oralhistory_ref |>
-                     dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
-  dplyr::select(-x1) |>
-  tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_sentence(cat))
-
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
-
-### Grouped bar plot by narrator name with grouping rectangle ------------------
-figure_print <- ""
+table_raw0 <- table_raw <- 
+  oral_histories_original0 |> 
+  dplyr::select(id, date, #word_count, 
+                weighted_percent, percent_category, confidence_score, location_category, 
+                latitude, longitude) |> 
+  sf::st_as_sf(coords = c("longitude", "latitude"), 
+               remove = FALSE,
+               crs = crs_in) |>
+  sf::st_transform(crs = crs_out) |> 
+  dplyr::mutate(id = factor(id, ordered = TRUE), 
+                location_category0 = dplyr::case_when(
+                  location_category == "LOI" ~ "Location of Interview", 
+                  location_category == "Additional" ~ "Mentioned in Interview", 
+                  location_category == "Oregon" ~ "Location of Interview (Oregon)", 
+                ))
 
 
-### PCA - fishing experience ---------
+### Map of all points ------------------
 
-plot_pca(
-  table_raw0 = table_raw0, 
-  var00 = "fishing_experience", 
-  legend_title = "Fishing Experience") 
+#### Get world map ---------------------------------------------------------------
 
-# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Fishing experience (var00) did not significantly predict frequency.
+crs_out <- "EPSG:3338"
+crs_in <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
 
-### PCA - oral history collection ---------
+world_coordinates <- maps::map("world", plot = FALSE, fill = TRUE) |> 
+  sf::st_as_sf() |>
+  # sf::st_union() |> 
+  sf::st_transform(crs = crs_out) |> 
+  dplyr::filter(ID %in% c("USA", "Russia", "Canada")) |> 
+  dplyr::mutate(ID = ifelse(ID == "USA", "Alaska", ID))
 
-plot_pca(
-  table_raw0 = table_raw0, 
-  var00 = "collection", 
-  legend_title = "Oral History Collection") 
+#### Get place labels for map ----------------------------------------------------
 
-# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Differences among collections (var00) were generally not significant, though the Women in Alaska Fisheries collection showed a marginally lower frequency.
+place_labels <- data.frame(
+  type = c("islands", "islands", "islands", "islands", 
+           "mainland", "mainland", "mainland", 
+           "convention line", "peninsula", 
+           "survey", "survey", "survey", "survey", "survey"), 
+  lab = c("Pribilof Isl.", "Nunivak", "St. Matthew", "St. Lawrence", 
+          "Alaska", "Russia", "Canada", 
+          "U.S.-Russia Maritime Boundary", "Alaska Peninsula", 
+          "Aleutian Islands", "Gulf of Alaska", 
+          "Bering\nSea\nSlope", "Eastern\nBering Sea", "Northern\nBering Sea"), 
+  angle = c(0, 0, 0, 0, 0, 0, 0, 30, 45, 0, 0, 0, 0, 0), 
+  lat = c(57.033348, 60.7, 61, 64.2, 
+          62.296686, 62.798276, 63.722890, 
+          62.319419, 56.352495, 
+          53.25, 54.720787, 
+          57, 57.456912, 63.905936), 
+  lon = c(-167.767168, -168, -174, -170.123016, 
+          -157.377210, 173.205231, -136.664024, 
+          -177.049063, -159.029430, 
+          -173, -154.794131, 
+          -176, -162, -165)) |>
+  dplyr::filter(type != "peninsula") |> 
+  dplyr::filter(type != "survey") |> 
+  # dplyr::mutate(
+  #   color = dplyr::case_when(
+  #     type == "mainland" ~ "grey80", 
+  #     TRUE ~ "grey30"), 
+  #   fontface = dplyr::case_when(
+  #     type == "mainland" ~ "bold", 
+  #     TRUE ~ "regular"),
+  #   size = dplyr::case_when(
+  #     type == "mainland" ~ 3, 
+  #     TRUE ~ 2) ) |> 
+  sf::st_as_sf(coords = c("lon", "lat"),
+               crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") |>
+  sf::st_transform(crs = crs_out) 
 
-### PCA - indigenous00 ---------
+#### Map boundaries ----------------------------------------------------
 
-plot_pca(
-  table_raw0 = table_raw0, 
-  var00 = "indigenous00", 
-  legend_title = "Indigenous Status") 
+boundaries <- data.frame(lon = c(-170, -150), # c(-180, -140)
+                         lat = c(50, 64) )  |> # c(46, 66)
+  sf::st_as_sf(coords = c("lon", "lat"),
+               crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") |>
+  sf::st_transform(crs = crs_out) |> 
+  sf::st_coordinates() |> 
+  data.frame()
 
-# After accounting for repeated measures by participant (id), frequency differed significantly across categories, with “Moderately positive” associated with ~10 units higher and “Very positive” with ~10 units lower frequency compared to the reference category. Additionally, non-Indigenous respondents reported frequencies about 5.5 units higher than Indigenous respondents.
+#### Plot map --------------------------------------------------------------------
 
+figure_print <- 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(data = world_coordinates,
+                   fill = "grey70",
+                   color = "grey80")  + 
+  # Manage Axis extents (limits) and breaks
+  ggplot2::scale_x_continuous(name = "Longitude °W",
+                              breaks = seq(-180, -150, 5)) +
+  ggplot2::scale_y_continuous(name = "Latitude °N",
+                              breaks = seq(50, 65, 5)) + # seq(52, 62, 2)
+  ggplot2::geom_sf_text(
+    data = place_labels |> dplyr::filter(type == "mainland"),
+    mapping = aes(label = lab, angle = angle), 
+    color = "grey60", 
+    size = 3, 
+    show.legend = FALSE) + 
+  ggplot2::geom_sf_text(
+    data = place_labels |> dplyr::filter(type == "survey"),
+    mapping = aes(label = lab, angle = angle), 
+    color = "black",
+    fontface = "bold",
+    size = 2, 
+    show.legend = FALSE) + 
+  ggplot2::geom_sf_text(
+    data = place_labels |> dplyr::filter(!(type %in% c("mainland", "survey"))),
+    mapping = aes(label = lab, angle = angle), 
+    color = "grey10", 
+    fontface = "italic", 
+    size = 2, 
+    show.legend = FALSE) +
+  ggplot2::geom_sf(
+    data = table_raw, 
+    mapping = aes(
+      geometry = geometry, 
+      shape = location_category0, 
+      color = id),
+    size = 3, 
+    alpha = 0.7) + 
+  # manually define color for points
+  ggplot2::scale_color_viridis_d(
+    option = "E", 
+    begin = .2, 
+    end = .8, 
+    name = "Interview ID") +
+  ggplot2::guides(color = guide_legend(ncol = 6)) + 
+  ggplot2::scale_shape(name = "Location Type") +
+  ggplot2::coord_sf(xlim = boundaries$X,
+                    ylim = boundaries$Y) +
+  theme_custom() +
+  ggplot2::theme(
+    panel.grid = element_line(colour="grey80", linewidth = 0.5), 
+    # legend.text = element_text(size = 10, angle = 90),
+    legend.direction = "vertical",
+    legend.box = "horizontal",
+    # legend.justification = c(0, 1),
+    legend.key = element_blank(), 
+    legend.position = "bottom", # "bottom",
+    legend.text.position = "right"# "bottom"
+  )
+nickname <- paste0(nickname0, "_everything")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
