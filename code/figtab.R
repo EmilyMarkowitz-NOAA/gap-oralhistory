@@ -884,11 +884,22 @@ temp <- plot_lm_pca_stacked(
   x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
   nickname0 = nickname0) 
 
-# None of these alternative ways of representing respondent characteristics (region, fishing experience, collection, Indigenous identity) meaningfully improve model fit beyond category and individual-level random effects.
-# Likelihood-ratio tests indicated no improvement in model fit when alternative respondent-level predictors were included (all p > 0.4), supporting a parsimonious model including category and a random intercept for respondent.
-
 a <- temp$table_lm_comb
 anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
+
+# Data: table_lm
+# Models:
+#   a$`Indigenous Status`: freq ~ var00 + cat + (1 | id)
+# a$`Fishing Experience`: freq ~ var00 + cat + (1 | id)
+# a$Region: freq ~ var00 + cat + (1 | id)
+# a$`Oral History Collection`: freq ~ var00 + cat + (1 | id)
+# npar    AIC    BIC  logLik -2*log(L)  Chisq Df Pr(>Chisq)
+# a$`Indigenous Status`          8 593.68 615.98 -288.84    577.68                     
+# a$`Fishing Experience`         9 596.15 621.24 -289.08    578.15 0.0000  1     1.0000
+# a$Region                      10 597.11 624.99 -288.56    577.11 1.0411  1     0.3076
+# a$`Oral History Collection`   10 596.77 624.64 -288.38    576.77 0.3438  0
+
+# The model including Indigenous status provides the best overall fit to the data (lowest AIC), suggesting it explains slightly more variation in how frequently different fishing-related categories are mentioned than the other grouping variables. Adding fishing experience, region, or oral history collection does not significantly improve model fit relative to the Indigenous-status model (likelihood ratio tests all non-significant, p ≥ 0.31). This indicates that, after accounting for the type of fishing-related category and repeated observations within individuals, differences in mention frequency are more strongly structured by Indigenous status than by region, fishing experience, or collection source, and that these latter factors do not contribute substantial additional explanatory power for Boat, Crab, Fishing, Net, and Salmon references.
 
 ## Figure 3: Hierarchical plot of themes -----------------------------------------------
 #NOT POSSIBLE TO RECREATE, this is a plot of what we've got
@@ -938,7 +949,7 @@ comb <- combn(names(table_raw)[2:ncol(table_raw)], 2, simplify = FALSE)
 comb <- data.frame(matrix(data = unlist(comb), ncol = 2, byrow = TRUE))
 names(comb) <- c("var", "var1")
 
-table_raw <- table_raw |> 
+table_raw0 <- table_raw <- table_raw |> 
   dplyr::mutate(
     x1 = gsub(pattern = "[0-9]+ : ", replacement = "", x = x1), 
     dplyr::across(everything(), ~na_if(., "NULL"))
@@ -1101,6 +1112,68 @@ figure_print <-
 
 nickname <- paste0(nickname0, "network")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+## Figure 4b: bar chart of themes -----------------------------------------------
+
+nickname0 <- "fig-4b-themes-manualcode-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_portrait_width
+
+table_raw <- row_percent_interviews0 
+names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
+
+table_raw0 <- table_raw <- table_raw |> 
+  dplyr::mutate(
+    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2)))  ) |> 
+  dplyr::select(-x1) |> 
+  dplyr::left_join(oralhistory_orig |> 
+                     dplyr::filter(location_category == "LOI") |>
+                     dplyr::mutate(id = as.numeric(paste0(id))) |> 
+                     dplyr::select(id, name = source, 
+                                   indigenous, indigenous00, 
+                                   fishing_experience, collection, demographic, 
+                                   region30, region30_desc, region100, region100_desc, 
+                                   change_score_language, emotional_score)) |>
+  tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
+  dplyr::mutate(cat = stringr::str_to_title(cat), , 
+                id = factor(id, ordered = TRUE), 
+                freq = as.numeric(gsub(pattern = "%", replacement = "", x = freq)))
+
+
+### pca/lm/Stacked by [var] -----------------------------------------
+
+# Does frequency differ by region and by category?
+
+temp <- plot_lm_pca_stacked(
+  table_raw0 = table_raw0, 
+  var00 = c("region100_desc","fishing_experience", "collection", "indigenous00"),
+  x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
+  nickname0 = nickname0) 
+
+a <- temp$table_lm_comb
+anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
+# > unique(table_raw0$cat)
+# [1] "Boat"    "Crab"    "Fishing" "Net"     "Salmon" 
+
+# refitting model(s) with ML (instead of REML)
+# Data: table_lm
+# Models:
+#   a$`Indigenous Status`: freq ~ var00 + cat + (1 | id)
+# a$`Fishing Experience`: freq ~ var00 + cat + (1 | id)
+# a$Region: freq ~ var00 + cat + (1 | id)
+# a$`Oral History Collection`: freq ~ var00 + cat + (1 | id)
+# npar    AIC    BIC  logLik -2*log(L) Chisq Df Pr(>Chisq)
+# a$`Indigenous Status`          8 1073.5 1095.8 -528.77    1057.5                    
+# a$`Fishing Experience`         9 1075.5 1100.6 -528.77    1057.5     0  1     1.0000
+# a$Region                      10 1077.5 1105.4 -528.77    1057.5     0  1     0.9998
+# a$`Oral History Collection`   10 1077.5 1105.4 -528.77    1057.5     0  0   
+
+# We compared linear mixed-effects models predicting the frequency of mentions of Boat, Crab, Fishing, Net, and Salmon, including a random intercept for individual and fixed effects for category and respondent-level characteristics (Indigenous status, fishing experience, region, or oral history collection). Model comparisons using maximum likelihood indicated that all four models fit the data equivalently, with identical log-likelihoods and non-significant likelihood-ratio tests (p ≈ 1), and minor differences in AIC/BIC driven only by the number of parameters. These results indicate that, after accounting for category and individual-level variation, variation in term frequency is not meaningfully explained by respondent experience, region, or collection type, and is only slightly structured by Indigenous status. Consequently, individual differences and the category of fishing-related term largely drive patterns of mention frequency.
+
+# Across models predicting the frequency of Boat, Crab, Fishing, Net, and Salmon mentions (with a random intercept for individual), the Indigenous Status model shows the best fit (lowest AIC), indicating it explains slightly more variation than the alternatives. Adding Fishing Experience, Region, or Oral History Collection does not significantly improve model fit (all likelihood‐ratio tests non-significant), suggesting these factors do not add explanatory power beyond Indigenous status for patterns of fishing-related references. Overall, variation in how often these fishing terms are mentioned appears to be structured more by Indigenous status than by regional context, experience category, or collection source.
+
+# The model including Indigenous status provides the best overall fit to the data (lowest AIC), suggesting it explains slightly more variation in how frequently different fishing-related categories are mentioned than the other grouping variables. Adding fishing experience, region, or oral history collection does not significantly improve model fit relative to the Indigenous-status model (likelihood ratio tests all non-significant, p ≥ 0.31). This indicates that, after accounting for the type of fishing-related category and repeated observations within individuals, differences in mention frequency are more strongly structured by Indigenous status than by region, fishing experience, or collection source, and that these latter factors do not contribute substantial additional explanatory power for Boat, Crab, Fishing, Net, and Salmon references.
+
 
 ## Figure 5: bar chart of themes -----------------------------------------------
 
