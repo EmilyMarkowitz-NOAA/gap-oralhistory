@@ -1386,6 +1386,8 @@ map_funct  <- function(table_raw, points0 = TRUE) {
   return(figure_print)
 }
 
+### Map with no grouping, all data  -------------------------------------------
+
 figure_print <- map_funct(table_raw)  + 
   ggplot2::theme(legend.position = c(0.37, 0.85)) +
   ggplot2::coord_sf(xlim = c(min(table_raw$X)-25000, max(table_raw$X)+25000),
@@ -1416,7 +1418,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # nickname <- paste0(nickname0, "_byregion")
 # save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-### Map of only LOI -------------------------------------------
+### Map of only LOI with 100lm grouping-------------------------------------------
 
 table_raw <- table_raw0 |> 
   dplyr::filter(location_category == "LOI") |> 
@@ -1461,7 +1463,66 @@ figure_print <- ggdraw() +
   draw_plot(figure_print) +
   draw_plot(inset_map, x = 0.675, y = 0.75, width = 0.25, height = 0.25)
 
-nickname <- paste0(nickname0, "LOIonly-grouped")
+nickname <- paste0(nickname0, "LOIonly-grouped100")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+ggplot2::ggsave( # save your plot
+  path = "./output/",
+  dpi = 1200,
+  bg = "transparent",
+  filename = paste0(nickname, ".png"), # Always save in pdf so you can make last minute edits in adobe acrobat!
+  plot = figure_print, # call the plot you are saving
+  width = width0, 
+  height = height0, 
+  units = "in") #recall, A4 pages are 8.5 x 11 in - 1 in margins
+
+
+### Map of only LOI with 100lm grouping-------------------------------------------
+
+table_raw <- table_raw0 |> 
+  dplyr::filter(location_category == "LOI") |> 
+  dplyr::group_by(region = region30, region_desc = region30_desc, location_category0, location_category) |> 
+  dplyr::summarise(#geometry = geometry, 
+    X = mean(X), 
+    Y = mean(Y), 
+    id = n())
+
+figure_print <- map_funct(table_raw, points0 = FALSE)  + 
+  ggplot2::theme(legend.position = c(0.37, 0.85))  + 
+  ggplot2::guides(shape = "none") + 
+  # ggplot2::geom_sf(
+  #   data = table_raw,
+  #   mapping = aes(
+  #     geometry = geometry, # st_jitter(geometry),
+  #     ),
+  #   fill = "grey20",
+  #   # color = "transparent", 
+  #   alpha = .5,
+  #   # vjust = -.7,
+  #   size = 5,
+  #   show.legend = FALSE
+  # ) +
+  ggplot2::geom_sf_label(
+    data = table_raw,
+    mapping = aes(
+      geometry = geometry, # st_jitter(geometry),
+      label = id
+    ),
+    size = 5, 
+    label.r = unit(0, "lines"), 
+    border.color = "grey80", 
+    # color = "grey80",
+    vjust = -.25,
+    show.legend = FALSE
+  ) +
+  ggplot2::coord_sf(xlim = c(min(table_raw$X)-25000, max(table_raw$X)+25000),
+                    ylim = c(min(table_raw$Y)-25000, max(table_raw$Y)+25000))
+
+figure_print <- ggdraw() +
+  draw_plot(figure_print) +
+  draw_plot(inset_map, x = 0.675, y = 0.75, width = 0.25, height = 0.25)
+
+nickname <- paste0(nickname0, "LOIonly-grouped30")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ggplot2::ggsave( # save your plot
