@@ -167,8 +167,19 @@ place_labels <- data.frame(
 oralhistory_ref <- oralhistory_ref_edited0  |> 
   dplyr::select(-word_count, -weighted_percent, -source, 
                 -date, -link, -percent_category) |> 
+  dplyr::rename(change_score_old = change_score, 
+                change_score_language_old = change_score_language, 
+                emotional_score_old = emotional_score) |> 
   dplyr::mutate(id = factor(id, ordered = TRUE), 
-                indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous"))
+                source_fl = gsub(pattern = ",", replacement = "", x = source_fl),
+                  indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous")) |> 
+  tidyr::separate(source_fl, into = c("first", "last"), #remove = FALSE, 
+                  sep = " ", extra = "drop", fill = "right") |> 
+  dplyr::full_join(ohp_table2_manualcoding0 |>
+                     dplyr::mutate(oral_history = gsub(pattern = ",", replacement = "", x = oral_history)) |> 
+                     tidyr::separate(oral_history, into = c("first", "last"), #remove = FALSE, 
+                                                             sep = " ", extra = "drop", fill = "right") ) |> 
+  dplyr::rename(change_score_language = env_change_openness_1_3, change_score = change_language_1_3, emotional_score = emotional_level_1_3)
 
 oralhistory_orig <- oral_histories_original0 |> 
   sf::st_as_sf(coords = c("longitude", "latitude"), 
@@ -1679,10 +1690,10 @@ table_raw0 <- dplyr::bind_rows(
       interviewee = stringr::str_to_title(interviewee)
       ) |> 
     tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "val") |>
-    dplyr::mutate(Theme = dplyr::case_when(
-      Theme %in% c("net", "boat", "fishing") ~ "net", 
-      Theme %in% c("salmon", "crab", "fish") ~ "fish", 
-      Theme == "change" ~ "change"
+    dplyr::mutate(cat = dplyr::case_when(
+      cat %in% c("net", "boat", "fishing") ~ "net", 
+      cat %in% c("salmon", "crab", "fish") ~ "fish", 
+      cat == "change" ~ "change"
     ))  |> 
     dplyr::group_by(interviewee, cat) |> 
     dplyr::summarise(val = sum(val, na.rm = TRUE)) |> 
