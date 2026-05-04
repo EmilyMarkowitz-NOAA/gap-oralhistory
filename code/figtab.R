@@ -1332,7 +1332,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
 table_raw <- table_raw0 |>
-  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
+  tidyr::pivot_wider(id_cols = c(Theme, Interviewee), names_from = Method, values_from = Count, values_fn = sum) |>
   # Replace NAs with 0 in case an interviewee is missing in one method
   dplyr::mutate(Notes = replace_na(Notes, 0),
                 Transcript = replace_na(Transcript, 0))
@@ -1405,7 +1405,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # 1. Prepare the data (assuming you have 'Notes' and 'Transcript' columns)
 table_raw <- table_raw0 |>
-  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
+  tidyr::pivot_wider(id_cols = c(Theme, Interviewee), names_from = Method, values_from = Count, values_fn = sum) |>
   # Replace NAs with 0 in case an interviewee is missing in one method
   dplyr::mutate(Notes = replace_na(Notes, 0),
                 Transcript = replace_na(Transcript, 0))
