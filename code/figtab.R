@@ -31,11 +31,17 @@ PKG <- c(
   "igraph", 
   "ggraph", 
   
+  "ggalluvial",
+  
   # Spatial mapping
   "sf",
   "ggspatial", 
   "raster",
   "stars", 
+  
+  "treemapify", 
+  "plotly",
+  "reticulate", 
   
   # stats
   "lme4"
@@ -400,177 +406,177 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
   table_raw_comb <- table_raw_combpca <- c()
   table_lm_comb <- list()
   figs <- list()
-    
-  for (iii in 1:length(var00)) {
   
-  ## Stacked bar plot-------------------------------  
+  for (iii in 1:length(var00)) {
+    
+    ## Stacked bar plot-------------------------------  
     var000 <- var00[iii]
     x_name0 <- x_name[iii]
     
-  table_raw <- table_raw0 |> 
-    dplyr::rename(var00 = {{var000}}) |> 
-    dplyr::group_by(cat, var00) |> 
-    dplyr::summarise(freq = sum(freq, na.rm = TRUE)) |> 
-    dplyr::ungroup() |> 
-    dplyr::left_join(
-      table_raw0 |> 
-        dplyr::rename(var00 = {{var000}}) |> 
-        dplyr::select(id, var00) |> 
-        dplyr::distinct() |> 
-        dplyr::group_by(var00) |> 
-        sf::st_drop_geometry() |> 
-        dplyr::summarise(n_interviews = n()) |> 
-        dplyr::ungroup()) |> 
-    dplyr::mutate(freq_rel = freq/n_interviews, 
-                  var001 = paste0(var00, "\n(", n_interviews, ")"))
-  
-  table_raw_comb <- dplyr::bind_rows(table_raw_comb, 
-                                     table_raw |> dplyr::mutate(var000 = var000, x_name = x_name0))
-  
-  ### frequency bar plot ---------------------------------------------
-  figure_print <- figure_print_norel <- 
-    ggplot2::ggplot(
-      data = table_raw, 
-      mapping = aes(x = var001, y = freq, fill = cat)) +
-    ggplot2::geom_bar(position="dodge", stat="identity") +
-    ggplot2::scale_fill_viridis_d(
-      name = "Theme", 
-      option = "E", 
-      begin = .2, 
-      end = .8, 
-      direction = -1) +
-    ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+    table_raw <- table_raw0 |> 
+      dplyr::rename(var00 = {{var000}}) |> 
+      dplyr::group_by(cat, var00) |> 
+      dplyr::summarise(freq = sum(freq, na.rm = TRUE)) |> 
+      dplyr::ungroup() |> 
+      dplyr::left_join(
+        table_raw0 |> 
+          dplyr::rename(var00 = {{var000}}) |> 
+          dplyr::select(id, var00) |> 
+          dplyr::distinct() |> 
+          dplyr::group_by(var00) |> 
+          sf::st_drop_geometry() |> 
+          dplyr::summarise(n_interviews = n()) |> 
+          dplyr::ungroup()) |> 
+      dplyr::mutate(freq_rel = freq/n_interviews, 
+                    var001 = paste0(var00, "\n(", n_interviews, ")"))
+    
+    table_raw_comb <- dplyr::bind_rows(table_raw_comb, 
+                                       table_raw |> dplyr::mutate(var000 = var000, x_name = x_name0))
+    
+    ### frequency bar plot ---------------------------------------------
+    figure_print <- figure_print_norel <- 
+      ggplot2::ggplot(
+        data = table_raw, 
+        mapping = aes(x = var001, y = freq, fill = cat)) +
+      ggplot2::geom_bar(position="dodge", stat="identity") +
+      ggplot2::scale_fill_viridis_d(
+        name = "Theme", 
+        option = "E", 
+        begin = .2, 
+        end = .8, 
+        direction = -1) +
+      ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+                                  expand = expand_custom) +
+      ggplot2::scale_x_discrete(name = x_name0, 
+                                labels = function(x) str_wrap(x, width = 20), 
                                 expand = expand_custom) +
-    ggplot2::scale_x_discrete(name = x_name0, 
-                              labels = function(x) str_wrap(x, width = 20), 
-                              expand = expand_custom) +
-    theme_custom() 
-  nickname <- paste0(nickname0, var000, "-stack")
-  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-  
-  figs <- c(figs, figure_print)
-  names(figs)[length(figs)] <- nickname
-  
-  ### Realitive frequency bar plot ---------------------------------------------
-  figure_print <- figure_print_rel <- 
-    ggplot2::ggplot(
-      data = table_raw, 
-      mapping = aes(x = var00, y = freq_rel, fill = cat)) +
-    ggplot2::geom_bar(position="dodge", stat="identity") +
-    ggplot2::scale_fill_viridis_d(
-      name = "Theme", 
-      option = "E", 
-      begin = .2, 
-      end = .8, 
-      direction = -1) +
-    ggplot2::scale_y_continuous(name = "Relative Frequency of Code References", 
+      theme_custom() 
+    nickname <- paste0(nickname0, var000, "-stack")
+    save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+    
+    figs <- c(figs, figure_print)
+    names(figs)[length(figs)] <- nickname
+    
+    ### Realitive frequency bar plot ---------------------------------------------
+    figure_print <- figure_print_rel <- 
+      ggplot2::ggplot(
+        data = table_raw, 
+        mapping = aes(x = var00, y = freq_rel, fill = cat)) +
+      ggplot2::geom_bar(position="dodge", stat="identity") +
+      ggplot2::scale_fill_viridis_d(
+        name = "Theme", 
+        option = "E", 
+        begin = .2, 
+        end = .8, 
+        direction = -1) +
+      ggplot2::scale_y_continuous(name = "Relative Frequency of Code References", 
+                                  expand = expand_custom) +
+      ggplot2::scale_x_discrete(name = x_name0, 
+                                labels = function(x) str_wrap(x, width = 20), 
                                 expand = expand_custom) +
-    ggplot2::scale_x_discrete(name = x_name0, 
-                              labels = function(x) str_wrap(x, width = 20), 
-                              expand = expand_custom) +
-    theme_custom() 
-  nickname <- paste0(nickname0, var000, "-stackrel")
-  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
-  figs <- c(figs, figure_print)
-  names(figs)[length(figs)] <- nickname
-  
-  ## PCA -------------------------------  
-  # 1. Reshape data to wide format (one row per ID, columns = categories)
-  table_raw <- table_raw0 |> 
-  tidyr::drop_na() |> 
-    sf::st_drop_geometry() |> 
-    dplyr::rename(var00 = {{var000}}) |> 
-    tidyr::pivot_wider(
-      id_cols = c(id, var00),
-      names_from = cat,
-      values_from = freq
-    )
-  
-  # 2. Run PCA on the numeric columns (categories)
-  pca_res <- prcomp(table_raw[, 3:ncol(table_raw)], scale. = TRUE)
-  
-  # 3. Add PCA scores (PC1 and PC2) to the wide table
-  table_raw <- table_raw |> 
-    dplyr::mutate(
-      PC1 = pca_res$x[, 1],
-      PC2 = pca_res$x[, 2]
-    )
-  
-  # 4. Make PCA scatter plot colored by indigenous00
-  colors0 <- viridis::mako(length(unique(table_raw$var00)), direction = -1, begin = 0.2, end = .8)
-  
-  figure_print <- figure_print_pca <- 
-    ggplot2::ggplot(table_raw, 
-                    aes(x = PC1, y = PC2, color = var00, fill = var00)) +
-    ggplot2::stat_ellipse(alpha = 0.1, # , color = NA
-                          geom = "polygon") +  # semi-transparent cloud
-    ggplot2::geom_point(size = 3, 
-                        alpha = 0.8) +
-    ggplot2::theme_minimal()  + 
-    # see::scale_fill_oi(name = x_name0,palette = "black_first") + 
-    # see::scale_color_oi(name = x_name0,palette = "black_first") +
-    ggplot2::scale_fill_manual(name = x_name0,
-                               values = colors0) +
-    ggplot2::scale_color_manual(name = x_name0,
-                                values = colors0) +
-    ggplot2::labs(
-      x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
-      y = paste0("PC2 (", round(summary(pca_res)$importance[2,2]*100, 1), "%)")#,
-      # title = "PCA of Frequencies by ID"
-    ) +
-    theme_custom() 
-  nickname <- paste0(nickname0, var000, "-pca")
-  save_figures(figure_print = figure_print, table_raw = pca_res, nickname = nickname, width = width0, height = height0)
-  
-  figs <- c(figs, figure_print)
-  names(figs)[length(figs)] <- nickname
-  table_raw_combpca <- dplyr::bind_rows(table_raw_combpca, 
-                                     table_raw |> dplyr::mutate(var000 = var000, x_name = x_name0))
-  # ## Box and Whisker ---------------
-  # 
-  # figure_print <- figure_print_boxw <- 
-  #   ggplot2::ggplot(
-  #     data = table_raw, 
-  #     mapping = aes(x = var001, y = freq, fill = cat)) +
-  #   geom_boxplot(notch = TRUE) +
-  #   ggplot2::scale_fill_viridis_d(
-  #     name = "Theme", 
-  #     option = "E", 
-  #     begin = .2, 
-  #     end = .8, 
-  #     direction = -1) +
-  #   ggplot2::scale_y_continuous(name = "Frequency of Code References", 
-  #                               expand = expand_custom) +
-  #   ggplot2::scale_x_discrete(name = x_name, 
-  #                             labels = function(x) str_wrap(x, width = 20), 
-  #                             expand = expand_custom) +
-  #   theme_custom() 
-  # nickname <- paste0(nickname0, var00)
-  # save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-  
-  # https://steverxd.github.io/Stat_tests/three-or-more-means.html
-  # two ways of doing the same thing: anova and lm
-  
-  ## Anova -----------------------------------------
-  table_aov <- car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
-  
-  ## Linear mixed-effects model -------------------------------
-  table_lm <- table_raw0 |> 
-    dplyr::rename(var00 = {{var000}}) |> 
-    dplyr::mutate(id = as.numeric(paste0(id)))
-  # table_lm <- lm(freq ~ var00 + cat + (1 | id), data = table_lm)
-  table_lm <- lme4::lmer(freq ~ var00 + cat + (1 | id), data = table_lm)
-  # + (1 | id) ==> Each person gets their own baseline level of freq.
-  
-  # table_lm <- lm0 %>% summary() %>% print(digits = 8) # show summary output
-  
-  table_lm_comb <- c(table_lm_comb, table_lm)
-  names(table_lm_comb)[length(table_lm_comb)] <- x_name0
-  
+      theme_custom() 
+    nickname <- paste0(nickname0, var000, "-stackrel")
+    save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+    
+    figs <- c(figs, figure_print)
+    names(figs)[length(figs)] <- nickname
+    
+    ## PCA -------------------------------  
+    # 1. Reshape data to wide format (one row per ID, columns = categories)
+    table_raw <- table_raw0 |> 
+      tidyr::drop_na() |> 
+      sf::st_drop_geometry() |> 
+      dplyr::rename(var00 = {{var000}}) |> 
+      tidyr::pivot_wider(
+        id_cols = c(id, var00),
+        names_from = cat,
+        values_from = freq
+      )
+    
+    # 2. Run PCA on the numeric columns (categories)
+    pca_res <- prcomp(table_raw[, 3:ncol(table_raw)], scale. = TRUE)
+    
+    # 3. Add PCA scores (PC1 and PC2) to the wide table
+    table_raw <- table_raw |> 
+      dplyr::mutate(
+        PC1 = pca_res$x[, 1],
+        PC2 = pca_res$x[, 2]
+      )
+    
+    # 4. Make PCA scatter plot colored by indigenous00
+    colors0 <- viridis::mako(length(unique(table_raw$var00)), direction = -1, begin = 0.2, end = .8)
+    
+    figure_print <- figure_print_pca <- 
+      ggplot2::ggplot(table_raw, 
+                      aes(x = PC1, y = PC2, color = var00, fill = var00)) +
+      ggplot2::stat_ellipse(alpha = 0.1, # , color = NA
+                            geom = "polygon") +  # semi-transparent cloud
+      ggplot2::geom_point(size = 3, 
+                          alpha = 0.8) +
+      ggplot2::theme_minimal()  + 
+      # see::scale_fill_oi(name = x_name0,palette = "black_first") + 
+      # see::scale_color_oi(name = x_name0,palette = "black_first") +
+      ggplot2::scale_fill_manual(name = x_name0,
+                                 values = colors0) +
+      ggplot2::scale_color_manual(name = x_name0,
+                                  values = colors0) +
+      ggplot2::labs(
+        x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
+        y = paste0("PC2 (", round(summary(pca_res)$importance[2,2]*100, 1), "%)")#,
+        # title = "PCA of Frequencies by ID"
+      ) +
+      theme_custom() 
+    nickname <- paste0(nickname0, var000, "-pca")
+    save_figures(figure_print = figure_print, table_raw = pca_res, nickname = nickname, width = width0, height = height0)
+    
+    figs <- c(figs, figure_print)
+    names(figs)[length(figs)] <- nickname
+    table_raw_combpca <- dplyr::bind_rows(table_raw_combpca, 
+                                          table_raw |> dplyr::mutate(var000 = var000, x_name = x_name0))
+    # ## Box and Whisker ---------------
+    # 
+    # figure_print <- figure_print_boxw <- 
+    #   ggplot2::ggplot(
+    #     data = table_raw, 
+    #     mapping = aes(x = var001, y = freq, fill = cat)) +
+    #   geom_boxplot(notch = TRUE) +
+    #   ggplot2::scale_fill_viridis_d(
+    #     name = "Theme", 
+    #     option = "E", 
+    #     begin = .2, 
+    #     end = .8, 
+    #     direction = -1) +
+    #   ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+    #                               expand = expand_custom) +
+    #   ggplot2::scale_x_discrete(name = x_name, 
+    #                             labels = function(x) str_wrap(x, width = 20), 
+    #                             expand = expand_custom) +
+    #   theme_custom() 
+    # nickname <- paste0(nickname0, var00)
+    # save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+    
+    # https://steverxd.github.io/Stat_tests/three-or-more-means.html
+    # two ways of doing the same thing: anova and lm
+    
+    ## Anova -----------------------------------------
+    table_aov <- car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
+    
+    ## Linear mixed-effects model -------------------------------
+    table_lm <- table_raw0 |> 
+      dplyr::rename(var00 = {{var000}}) |> 
+      dplyr::mutate(id = as.numeric(paste0(id)))
+    # table_lm <- lm(freq ~ var00 + cat + (1 | id), data = table_lm)
+    table_lm <- lme4::lmer(freq ~ var00 + cat + (1 | id), data = table_lm)
+    # + (1 | id) ==> Each person gets their own baseline level of freq.
+    
+    # table_lm <- lm0 |> summary() |> print(digits = 8) # show summary output
+    
+    table_lm_comb <- c(table_lm_comb, table_lm)
+    names(table_lm_comb)[length(table_lm_comb)] <- x_name0
+    
   }
   
-## Combined facet ---------------------------------------------------
+  ## Combined facet ---------------------------------------------------
   ### frequency bar plot ---------------------------------------------
   figure_print <- figure_print_norel <- 
     ggplot2::ggplot(
@@ -762,9 +768,737 @@ expand_custom <- c(.005, .005)
 
 ## Figure 1: Hierarchical plot of themes -----------------------------------------------
 
-# TOLDEO - NOT POSSIBLE TO COMPLETE
+nickname0 <- "fig-1-hierarchical-themes-"
 
-nickname0 <- "fig-1-hierarchical-themes-auto-"
+height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+width0 <- full_page_landscape_width
+
+table_raw0 <- dplyr::bind_rows(
+  autocoded_themes_transcripts0 |> 
+    dplyr::mutate(method = "Transcript") |>
+    # head() |> 
+    dplyr::mutate(codes = gsub(pattern = "Codes\\\\transcripts\\\\",
+                               replacement = "", x = codes, fixed = TRUE)), 
+  autocoded_themes_notes0 |> 
+    # head() |> 
+    dplyr::mutate(method = "Notes") |>
+    dplyr::mutate(codes = gsub(pattern = "Codes\\\\notes_themes\\\\",
+                               replacement = "", x = codes, fixed = TRUE)) ) |> 
+  tidyr::separate(codes, into = c("theme", "node"), sep = "\\\\") |> 
+  dplyr::select(Theme = theme, node, number_of_coding_references, method) |> 
+  dplyr::ungroup()
+
+
+### Treemap -------------------------------------------------------------------
+# A treemap is excellent for showing the relative "weight" of nodes within a theme. We use subgroup to create the visual borders between "boat" and "change."
+library(treemapify)
+# table_raw <- table_raw0 |>
+#   # 1. Group by everything except value to consolidate duplicates
+#   dplyr::group_by(method, Theme, node) |>
+#   dplyr::summarise(number_of_coding_references = sum(number_of_coding_references), .groups = "drop") |>
+#   # 2. Filter out nodes that appear fewer than (e.g.) 3 times
+#   dplyr::filter(number_of_coding_references >= 2)
+
+# # Including phrases with greater than 1 node
+# table_raw <- dplyr::bind_rows(
+#   table_raw0 |> 
+#     dplyr::filter(number_of_coding_references > 1), 
+#   table_raw0 |>
+#     dplyr::filter(number_of_coding_references == 1) |>
+#     dplyr::group_by(method, Theme) |>
+#     dplyr::summarise(number_of_coding_references = sum(number_of_coding_references), .groups = "drop") |>
+#     dplyr::mutate(node = "other")) |> 
+#   dplyr::rename(number_of_coding_references = number_of_coding_references)
+
+table_raw <- table_raw0
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(area = number_of_coding_references, 
+                fill = Theme, 
+                label = node, 
+                subgroup = Theme)) +
+  treemapify::geom_treemap() +
+  # Add white borders around the themes
+  treemapify::geom_treemap_subgroup_border(colour = "white", size = 5) +
+  # Add the theme names as large background text
+  treemapify::geom_treemap_subgroup_text(
+    place = "centre", 
+    grow = TRUE, 
+    alpha = 0.25, 
+    colour = "black", 
+    fontface = "italic") +
+  # Add the specific node labels
+  treemapify::geom_treemap_text(
+    colour = "white", 
+    place = "centre", 
+    reflow = TRUE) +
+  # ggplot2::labs(title = "Hierarchy Treemap", 
+  #               subtitle = "Including phrases with greater than 1 node") +
+  ggplot2::facet_wrap(
+    ~ method, 
+    ncol = 1, 
+    strip.position = "left") +
+  ggplot2::guides(
+    fill = guide_legend(nrow = 1, 
+                        title.position = "left",
+                        label.position = "right")) +
+  theme_custom() + 
+  ggplot2::theme(
+    strip.text = element_text(size = 15), 
+    # legend.position = "bottom"
+    legend.position = "none") +
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "treemap")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = 13, height = width0)
+
+### Sunburst Chart -------------------------------------------------------------
+
+# 1. Prepare data for faceted rings by Method
+# Level 1: Theme (Inner ring)
+lev1 <- table_raw0 |>
+  dplyr::group_by(method, Theme) |>
+  dplyr::summarise(value = sum(number_of_coding_references), .groups = "drop") |>
+  dplyr::mutate(level = 1, 
+                label = Theme)
+
+# Level 2: Node (Outer ring)
+lev2 <- table_raw0 |>
+  dplyr::mutate(level = 2, 
+                label = node, 
+                value = number_of_coding_references)
+
+# 2. Combine and calculate together
+table_raw <- dplyr::bind_rows(lev1, lev2) |>
+  dplyr::arrange(method, level, Theme, label) |>
+  dplyr::mutate(Theme = factor(Theme), 
+                label = factor(label)) |>
+  # 1. Calculate the TOTAL refs for each method to find the overall max
+  dplyr::group_by(method) |>
+  dplyr::mutate(method_max = sum(value[level == 2])) |> 
+  dplyr::ungroup() |>
+  # 2. Identify the global maximum (the Transcript total)
+  dplyr::mutate(global_total = max(method_max)) |>
+  # 3. Calculate positions relative to the GLOBAL total
+  dplyr::group_by(method, level) |>
+  dplyr::mutate(
+    facet_total = sum(value),
+    running_total = cumsum(value),
+    # Use global_total so that Notes and Transcript start and end at the same relative angles
+    y_pos = (running_total - 0.5 * value),
+    # y_pos = facet_total - (running_total - 0.5 * value),
+    
+    # ANGLE CALCULATION: Now using the global_total as the denominator
+    raw_angle = 90 - (360 * (y_pos / global_total)),
+    
+    # FLIP LOGIC
+    angle = ifelse(raw_angle < -90, raw_angle + 180, raw_angle),
+    hjust_var = ifelse(raw_angle < -90, 1, 0)
+  ) |>
+  dplyr::ungroup()
+
+# 2. Create the Plot
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = level, y = value, fill = Theme)) +
+  
+  # RINGS - Use "stack" but explicitly tell it NOT to sort
+  ggplot2::geom_col(
+    width = 1, 
+    linewidth = .2, 
+    color = "white", 
+    position = position_stack(reverse = TRUE)) +
+  # position = position_stack(reverse = FALSE)) +
+  
+  # CENTER TITLE
+  ggplot2::geom_text(
+    data = table_raw |> dplyr::distinct(method),
+    mapping = aes(x = 0, y = 0, label = method),
+    inherit.aes = FALSE, 
+    size = 5, 
+    fontface = "bold") +
+  
+  # INNER LABELS - Use manual y_pos to match Level 2 exactly
+  ggplot2::geom_text(
+    data = table_raw |> filter(level == 1),
+    mapping = aes(x = 1, y = y_pos, label = label),
+    color = "black", 
+    size = 2.5, 
+    inherit.aes = FALSE) +
+  
+  # OUTER LABELS - Use manual y_pos and geom_text
+  ggplot2::geom_text(
+    data = table_raw |> filter(level == 2),
+    mapping = aes(
+      x = 2.6,        # Distance from center (just outside Level 2)
+      y = y_pos, 
+      label = label,
+      angle = angle, 
+      hjust = hjust_var,
+      colour = Theme
+    ),
+    size = 1.5,
+    check_overlap = FALSE, # Optional: hide labels that would crash into each other
+    inherit.aes = FALSE
+  ) +
+  
+  # IMPORTANT: theta = "y" and keep the scales consistent
+  ggplot2::coord_polar(
+    theta = "y", 
+    clip = "off") + 
+  ggplot2::facet_wrap(~ method, scales = "fixed") + 
+  theme_custom() +
+  ggplot2::theme_void() +
+  ggplot2::theme(
+    # 0.15 is roughly the left side, 0.3 is roughly the bottom-left area
+    # legend.position = c(0.15, 0.6), 
+    legend.position = "none", 
+    # 2. Adjust legend styling for the small space
+    legend.direction = "vertical",
+    legend.background = element_blank(),
+    # legend.key.size = unit(0.8, "lines"),
+    # legend.text = element_text(size = 8),
+    
+    # Forces the area behind the circles to be white
+    # panel.background = element_rect(fill = "white", color = NA),
+    # Forces the entire image canvas to be white
+    # plot.background = element_rect(fill = "white", color = NA),
+    # Remove outer margins (top, right, bottom, left)
+    plot.margin = margin(t = 35, r = 40, b = 35, l = -40, unit = "pt"),
+    # Increase space between the subplots
+    # You can use "cm", "in", or "lines"
+    panel.spacing = unit(5, "lines"),
+    # legend.position = "bottom",
+    strip.text = element_blank()
+  ) +
+  # Legend on one row, title on the left
+  ggplot2::guides(fill = guide_legend(
+    ncol = 1, 
+    title.position = "top",
+    title.vjust = 0.5
+  )) + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "sunburst")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### The Sankey Diagram - mixed methods ----------------------------------------
+
+# If you want to see how the volume of references "flows" from the Method (Transcript/Notes) to the Theme and finally to the specific Node, a Sankey is much more intuitive.
+# install.packages("ggalluvial")
+library(ggalluvial)
+
+table_raw <- table_raw0 |> 
+  dplyr::mutate(Theme = stringr::str_to_title(Theme) )
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw,
+  mapping = aes(y = number_of_coding_references, 
+                axis1 = method, 
+                axis2 = Theme, 
+                axis3 = node)) +
+  ggalluvial::geom_alluvium(
+    mapping = aes(fill = Theme), 
+    width = 1/12) +
+  ggalluvial::geom_stratum(
+    width = 1/12, 
+    fill = "white", 
+    color = "grey") +
+  # 1. Labels for Method and Theme (Rotated 90)
+  ggplot2::geom_text(
+    stat = "stratum", 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$node, NA, as.character(stratum)))), 
+    size = 3, 
+    angle = 90,
+    na.rm = TRUE
+  ) +
+  
+  # 2. Labels for Node (Horizontal)
+  ggplot2::geom_text(
+    stat = "stratum", 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$node, as.character(stratum), NA))), 
+    size = 2.5, 
+    angle = 0, # Horizontal
+    hjust = 1, # 1 = Right justified
+    nudge_x = 0.04,     # Adjust this decimal to move text closer to/further from the right line
+    na.rm = TRUE
+  ) +
+  ggplot2::theme_void() +
+  # theme_custom() + 
+  ggplot2::scale_x_discrete(
+    limits = c("Method", "Theme", "Node"), 
+    expand = c(.05, .05),
+    position = "top" 
+  ) +
+  ggplot2::theme(
+    axis.text.x = element_text(size = 12, face = "bold", color = "black"),
+    
+    legend.position = "none") + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "sankey-mixedmethods")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = full_page_portrait_width, height = full_page_portrait_height)
+
+### The Sankey Diagram - facet methods ----------------------------------------
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw,
+  mapping = aes(y = number_of_coding_references, 
+                # axis1 = method, 
+                axis2 = Theme, 
+                axis3 = node)) +
+  ggalluvial::geom_alluvium(
+    mapping = aes(fill = Theme), 
+    width = 1/12) +
+  ggalluvial::geom_stratum(
+    width = 1/12, 
+    fill = "white", 
+    color = "grey") +
+  # 1. Labels for Method and Theme (Rotated 90)
+  ggplot2::geom_text(
+    stat = "stratum", 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$node, NA, as.character(stratum)))), 
+    size = 3, 
+    angle = 90,
+    na.rm = TRUE
+  ) +
+  
+  # 2. Labels for Node (Horizontal)
+  ggplot2::geom_text(
+    stat = "stratum", 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$node, as.character(stratum), NA))), 
+    size = 2.5, 
+    hjust = 1, # 1 = Right justified
+    nudge_x = 0.04,     # Adjust this decimal to move text closer to/further from the right line
+    angle = 0, # Horizontal
+    na.rm = TRUE
+  ) +
+  ggplot2::theme_void() +
+  # theme_custom() + 
+  ggplot2::scale_x_discrete(
+    limits = c("Theme", "Node"), 
+    expand = c(.05, .05),
+    position = "top" 
+  ) +
+  ggplot2::theme(
+    axis.text.x = element_text(size = 12, face = "bold", color = "black"),
+    strip.text.y.left = element_text(
+      size = 12, 
+      face = "bold", 
+      angle = 90,           # 0 = Horizontal
+      # hjust = 1,           # Right-align the labels
+      # margin = margin(r = 10)
+    ), 
+    legend.position = "none") + 
+  ggplot2::facet_wrap(
+    ~ method, 
+    scales = "free_y", 
+    ncol = 1, 
+    strip.position = "left") + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "sankey-facetmethods")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = full_page_portrait_width, height = full_page_portrait_height)
+
+### Box and whisker ------------------------------------------------------------
+
+table_raw <- table_raw0
+
+# 1. Plotting the statistical distribution of nodes within each Theme
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = reorder(Theme, number_of_coding_references, FUN = median), 
+                                       y = number_of_coding_references, 
+                                       fill = method)) +
+  # 'position_dodge' puts the boxplots side-by-side for each Theme
+  ggplot2::geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.7, outlier.size = 1) +
+  
+  # # Flip the plot so Theme names are on the left and easy to read
+  # coord_flip() +
+  
+  # Professional Colors (Viridis)
+  ggplot2::scale_fill_viridis_d(
+    option = "G", direction = -1, begin = 0.2, end = 0.8) +
+  
+  # Clean White Theme
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    legend.position = "top",
+    # Remove horizontal grid lines to focus on the comparison groups
+    panel.grid.major.y = element_blank(), 
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    axis.text = element_text(color = "black", size = 10),
+    axis.title = element_text(face = "bold")
+  ) +
+  theme_custom() + 
+  ggplot2::labs(
+    # title = "Theme-Level Statistical Comparison",
+    # subtitle = "Boxplots show the distribution of coding references across nodes within each theme",
+    x = "Theme",
+    y = "Number of Coding References",
+    fill = "Method"
+  )
+
+nickname <- paste0(nickname0, "boxandwhisker")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = full_page_portrait_width, height = full_page_portrait_height)
+
+
+## Figure 1 cont: Summarized themes -----------------------------------------------
+
+nickname0 <- paste0(nickname0, "summarizedthemes-")
+
+table_raw0 <- table_raw0 |> 
+  dplyr::rename(Method = method, Count = number_of_coding_references) |> 
+    dplyr::mutate(Theme = dplyr::case_when(
+      Theme %in% c("net", "boat", "fishing") ~ "net", 
+      Theme %in% c("salmon", "crab", "fish") ~ "fish", 
+      Theme == "change" ~ "change"
+    ))  # |> 
+  # dplyr::group_by(Theme, Method) |> 
+  # dplyr::summarise(Count = sum(number_of_coding_references, na.rm = TRUE), 
+  #                  ) #|> 
+    # tidyr::pivot_wider(id_cols = "Theme", names_from = Method, values_from = Count) 
+
+expand_custom <- c(.005, .005)
+
+### dumbell/gap plot -----------------------------------------------------------
+
+# Percent Difference (The "Loss" Metric)
+# A simple but powerful descriptive statistic is the Mean Percentage Catch.
+# $$\text{Catch Rate} = \left( \frac{\sum \text{Count}_{\text{Notes}}}{\sum \text{Count}_{\text{Transcript}}} \right) \times 100$$
+# This tells you, for example, that "Notes only captured 15% of the total thematic density found in Transcripts."
+table_raw <- table_raw0
+
+catch_rate <- (sum(table_raw$Count[table_raw$Method == "Notes"], na.rm = TRUE)/sum(table_raw$Count[table_raw$Method == "Transcript"], na.rm = TRUE))*100
+
+# The Paired Comparison (Dumbbell Plot)This is the most effective visual for showing the "gap" for every single person.
+# Why it works: It shows the direction and magnitude of the difference simultaneously.
+
+# Pivot data to compare methods side-by-side
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = Count, 
+                y = Theme)) +
+  ggplot2::geom_line(aes(group = Theme), color = "grey80") +
+  ggplot2::geom_point(aes(color = Method), alpha = .7, size = 3) +
+  # ggplot2::facet_wrap(~Theme) +
+  theme_custom() +
+  ggplot2::labs(title = "Discrepancy between Methods by Interviewee", 
+                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.") ) + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "-dumbell")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Relative Emphasis (Percentage Bar Chart) ----------------------------------
+
+# Transcripts will almost always have higher raw numbers because they are wordier. The real question is: Is the "flavor" of the data the same? If "Fish" makes up 50% of the transcript coding, does it also make up 50% of the notes coding?
+
+# Statistical Goal: Compare Proportional Composition.
+
+# The Look: 100% stacked bar chart showing the ratio of themes within each method.
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = Method, y = Count, fill = Theme)) +
+  ggplot2::geom_bar(stat = "identity", position = "fill") +
+  ggplot2::theme_minimal() +
+  theme_custom() +
+  # ggplot2::theme(bor)
+  ggplot2::labs(title = "Thematic Composition by Method", 
+                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.")) + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) +
+  ggplot2::scale_y_continuous(name = "Proportion of Thematic Coding", 
+                              expand = expand_custom, 
+                              labels = scales::percent) 
+
+nickname <- paste0(nickname0, "-percentage")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Correlation Analysis (Scatter Plot with Regression) ---------------------
+
+# # Do the methods at least trend together? If an interviewee talks a lot about "fish" in the transcript, do the notes reflect that increase proportionally?
+# 
+# # 1. Calculate the stats manually for each Theme
+# table_raw <- table_raw0 |> 
+#   tidyr::pivot_wider(id_cols = "Theme", names_from = Method, values_from = Count) 
+# 
+# stats_data <- table_raw |>
+#   group_by(Theme) |>
+#   do({
+#     mod <- lm(Transcript ~ Notes, data = .)
+#     # Create the label strings
+#     data.frame(
+#       intercept = coef(mod)[1],
+#       slope = coef(mod)[2],
+#       r2 = summary(mod)$r.squared,
+#       label = paste0("y = ", round(coef(mod)[2], 2), "x + ", round(coef(mod)[1], 2), 
+#                      "\nR² = ", round(summary(mod)$r.squared, 3))
+#     )
+#   }) |>
+#   ungroup() |> 
+#   dplyr::mutate(
+#     label = ifelse(is.nan(r2), "", label), 
+#     r2 = ifelse(is.nan(r2), "", r2))
+# 
+# # 2. Plotting
+# figure_print <- ggplot2::ggplot(
+#   data = table_raw, 
+#   mapping = aes(x = Notes, y = Transcript)) +
+#   ggplot2::geom_point(alpha = 0.6) +
+#   ggplot2::geom_smooth(method = "lm", se = FALSE, color = "blue") +
+#   # Add the text using the stats_data table
+#   # We use Inf/-Inf to pin the text to the corners regardless of the scale
+#   ggplot2::geom_text(data = stats_data, 
+#                      aes(x = -Inf, y = Inf, label = label), 
+#                      hjust = -0.1, vjust = 1.1, size = 3.5, inherit.aes = FALSE) +
+#   ggplot2::facet_wrap(~Theme, scales = "free") +
+#   ggplot2::theme_minimal() +
+#   ggplot2::labs(title = "Correlation of Theme Density with Regression")
+# 
+# nickname <- paste0(nickname0, "-correllation")
+# save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Paired Wilcoxon Signed-Rank Test -------------------------------------------
+
+# Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
+table_raw <- table_raw0 |>
+  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
+  # Replace NAs with 0 in case an interviewee is missing in one method
+  dplyr::mutate(Notes = replace_na(Notes, 0),
+                Transcript = replace_na(Transcript, 0))
+
+# Run test for a specific theme (e.g., 'Fish')
+pp <- wilcox.test(table_raw$Transcript, table_raw$Notes, paired = TRUE)
+# Wilcoxon signed rank test with continuity correction
+# 
+# data:  table_raw$Transcript and table_raw$Notes
+# V = 1363.5, p-value = 1.914e-05
+# alternative hypothesis: true location shift is not equal to 0
+
+# 1. The Statistical Verdict
+
+# The p-value ($1.108 \times 10^{-5}$) is extremely small (well below the standard $0.05$ threshold).
+# Significant Difference: There is a statistically significant difference between the counts produced by the Transcript method and the Notes method.
+# Direction of Bias: Since $V = 1015.5$ is a high positive value in this context (assuming your Transcript counts are higher than Notes), it confirms that the Transcript method is yielding significantly more thematic density.The "So What?": You have statistical proof that relying solely on notes results in a significant "loss" of data volume compared to full transcription.
+# Figure: Since the Wilcoxon test proves a "location shift" (one is higher than the other), the best way to visualize this for a reader is a Boxplot with Significance Brackets. This makes the $p$-value result intuitive.
+
+library(ggpubr) # Great for adding p-values to plots
+table_raw <- table_raw0
+figure_print <- ggplot2::ggplot(table_raw, aes(x = Method, y = Count, fill = Method)) +
+  ggplot2::geom_boxplot(alpha = 0.7, width = 0.5) +
+  ggplot2::geom_jitter(width = 0.1, alpha = 0.3) + # Shows the individual interviewees
+  ggplot2::theme_minimal() +
+  ggplot2::scale_fill_manual(values = c("Notes" = "#E69F00", "Transcript" = "#56B4E9")) +
+  ggplot2::labs(
+    title = "Comparison of Coding Density",
+    subtitle = paste0("Wilcoxon Signed-Rank Test with Continuity Correction: p = ", formatC(pp$p.value, digits = 2, format = "f")),
+    y = "Number of Coding References"
+  ) +
+  ggplot2::theme(legend.position = "none") +
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "-wilcoxon")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Spearman’s Rank Correlation ----------------------------------------------- 
+
+# ($\rho$)This measures consistency rather than raw volume. 
+# It answers: "If Interviewee A is the top person for 'Net' mentions in the Transcript, are they also the top person in the Notes?"
+# Interpretation: A high $\rho$ (e.g., $> 0.8$) suggests that while Notes might have fewer words, they capture the relative importance of themes correctly.
+
+
+### Bland-Altman Plot ------------------------------------------------------------
+# This is the gold standard for "Method Agreement" in statistics. 
+# It plots the Average of the two methods on the $x$-axis and the Difference on the $y$-axis.
+# Why it works: It reveals if the "Notes" method gets less accurate as the interview gets longer/more complex. 
+# If the dots fan out as you move right, it means Notes fail specifically in high-density interviews.
+
+# How to Read Your Result:
+#   The Bias (Blue Line): Since your Wilcoxon test was significant, this line will be above zero. This represents the average number of references "lost" when using notes instead of transcripts.
+# 
+# The "Fan" Effect (Heteroscedasticity): Check the shape of the points.
+# 
+# Consistent: If the dots stay in a horizontal band, your notes are equally reliable regardless of how much the interviewee talks.
+# 
+# Fanning Out: If the cloud of dots gets wider as you move to the right (higher Average), it means your notes become less reliable during very intense, high-density interviews.
+# 
+# Outliers: Any points outside the Red Dotted Lines (Limits of Agreement) are cases where the discrepancy between the two methods was unusually high.
+
+# 1. Prepare the data (assuming you have 'Notes' and 'Transcript' columns)
+table_raw <- table_raw0 |>
+  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
+  # Replace NAs with 0 in case an interviewee is missing in one method
+  dplyr::mutate(Notes = replace_na(Notes, 0),
+                Transcript = replace_na(Transcript, 0))
+
+ba_data <- table_raw |>
+  mutate(
+    Avg  = (Transcript + Notes) / 2,
+    Diff = Transcript - Notes
+  )
+
+# 2. Calculate the statistical lines
+bias      <- mean(ba_data$Diff, na.rm = TRUE)
+sd_diff   <- sd(ba_data$Diff, na.rm = TRUE)
+upper_loa <- bias + (1.96 * sd_diff)
+lower_loa <- bias - (1.96 * sd_diff)
+
+# 3. Create the Plot
+figure_print <- ggplot(ba_data, aes(x = Avg, y = Diff)) +
+  geom_point(alpha = 0.6, size = 2) +
+  
+  # Horizontal line at 0 (Perfect Agreement)
+  geom_hline(yintercept = 0, linetype = "solid", color = "grey50") +
+  
+  # Bias line (The average gap)
+  geom_hline(yintercept = bias, linetype = "dashed", color = "blue", size = 0.8) +
+  
+  # Limits of Agreement (LoA)
+  geom_hline(yintercept = upper_loa, linetype = "dotted", color = "red") +
+  geom_hline(yintercept = lower_loa, linetype = "dotted", color = "red") +
+  
+  # Labels for the lines
+  annotate("text", x = max(ba_data$Avg), y = bias, label = "Bias", 
+           vjust = -1, hjust = 1, color = "blue") +
+  annotate("text", x = max(ba_data$Avg), y = upper_loa, label = "+1.96 SD", 
+           vjust = -1, hjust = 1, color = "red") +
+  annotate("text", x = max(ba_data$Avg), y = lower_loa, label = "-1.96 SD", 
+           vjust = 1.5, hjust = 1, color = "red") +
+  
+  theme_minimal() +
+  labs(
+    title = "Bland-Altman Plot: Agreement Analysis",
+    subtitle = "Assessing if method bias changes with coding density",
+    x = "Average of Transcript & Notes (Overall Density)",
+    y = "Difference (Transcript - Notes)"
+  ) +
+  facet_wrap(~Theme, scales = "free")
+
+nickname <- paste0(nickname0, "-blandaltman")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+##### Analysis
+# 1. The "Change" Theme: High Accuracy, Low Volume
+# The Look: The points are clustered very tightly near zero.
+# 
+# What it means: You are very accurate at capturing "Change." There is almost no difference between your notes and the transcript.
+# 
+# The Catch: This is likely because "Change" is a rare or very specific topic. When it comes up, you catch it. The bias (blue line) is small because there isn't much data to "lose."
+# 
+# 2. The "Fish" Theme: The "Classic" Note-Taking Gap
+# The Look: This is a textbook "fan" shape (heteroscedasticity). As the average mentions increase (moving right), the dots spread out vertically.
+# 
+# What it means: This is your most inconsistent category.
+# 
+# For short discussions about fish, you are accurate.
+# 
+# For long, dense discussions, your notes "drift." Sometimes you catch a lot (dots near 0), but sometimes you miss a huge amount (the dots near the bottom red line).
+# 
+# Verdict: Notes are a risky substitute for transcripts in this category if the interview is "fish-heavy."
+# 
+# 3. The "Net" Theme: Systemic Under-Reporting
+# The Look: Notice how the dots follow a clear upward diagonal trend. This is unusual for a Bland-Altman and very telling.
+# 
+# What it means: There is a proportional bias. The more an interviewee talks about "Nets," the more you fall behind in your notes at a constant rate.
+# 
+# Verdict: You aren't just "missing" things randomly; you are consistently capturing only a small fraction of the "Net" conversation. The transcript is exponentially richer here.
+
+### Bar plot of theme ------------------
+table_raw <- themes_notesonly0[,-1]
+names(table_raw) <- substr(x = names(table_raw),start = 3, stop = nchar(names(table_raw)))
+
+table_raw0 <- table_raw <- table_raw |>
+  # dplyr::select(-x1) |> 
+  tidyr::pivot_longer(names_to = "var", values_to = "val", cols = names(table_raw)) |> 
+  dplyr::mutate(var = gsub(x = var, pattern = "_", replacement = " "), 
+                var = stringr::str_to_title(var))
+
+colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
+figure_print <- 
+  ggplot2::ggplot(
+    data = table_raw, 
+    mapping = aes(x = var, y = val, fill = var)) +
+  ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
+  ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
+                             values = colors0, 
+                             expand = expand_custom) +
+  ggplot2::scale_y_continuous(name = "Coded Themes from Research Notes", 
+                              breaks = scales::pretty_breaks(), 
+                              expand = expand_custom) +
+  ggplot2::scale_x_discrete(name = "Themes") +
+  theme_custom() 
+nickname <- paste0(nickname0)
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+
 
 ## Figure 2: bar chart of themes -----------------------------------------------
 
@@ -840,7 +1574,7 @@ figure_print <-
   ggplot2::scale_y_continuous(name = "Frequency of Code References", 
                               expand = expand_custom) +
   ggplot2::scale_x_discrete(name = "Interview ID", 
-                              expand = expand_custom) +
+                            expand = expand_custom) +
   theme_custom()  + 
   ggplot2::geom_rect(
     data = table_raw_rect,
@@ -869,7 +1603,7 @@ figure_print <-
   ggplot2::scale_y_continuous(name = "Frequency of Code References", 
                               expand = expand_custom) +
   ggplot2::scale_x_discrete(name = "Interview ID", 
-                              expand = expand_custom) +
+                            expand = expand_custom) +
   theme_custom() 
 nickname <- paste0(nickname0, "stackedid")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
@@ -904,10 +1638,337 @@ anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigeno
 ## Figure 3: Hierarchical plot of themes -----------------------------------------------
 #NOT POSSIBLE TO RECREATE, this is a plot of what we've got
 
-nickname0 <- "fig-3-hierarchical-themes-manualcode-"
+nickname0 <- "fig-3-hierarchical-byinterview-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
+# table_raw0 <- dplyr::bind_rows(
+#   code_references_notes0 |> 
+#     rename_with(~ gsub("^[a-c]_", "", .x)) |> 
+#     dplyr::rename(interviewee = x1) |> 
+#     dplyr::mutate(interviewee = gsub("^\\d+ : ", "", interviewee), 
+#                   method = "Notes") , 
+#   code_references_interviews0[,1:6] |> 
+#     dplyr::rename(interviewee = x1) |>
+#     dplyr::rename_with(~ gsub("^[a-z]_|_\\d+$", "", .x)) |> 
+#     dplyr::mutate( 
+#                   method = "Transcript", 
+#                   interviewee = gsub("^\\d+ : Files\\\\", "", interviewee)) )
+
+table_raw0 <- dplyr::bind_rows(
+  code_references_notes0 |> 
+    rename_with(~ gsub("^[a-c]_", "", .x)) |> 
+    dplyr::rename(interviewee = x1) |> 
+    dplyr::mutate(interviewee = gsub("^\\d+ : ", "", interviewee), 
+                  interviewee = gsub(pattern = "_Deedee_ ", replacement = "", x = interviewee), 
+                  interviewee = gsub(pattern = ",", replacement = "", x = interviewee), 
+                  interviewee = gsub(pattern = " and", replacement = "", x = interviewee), 
+                  interviewee = stringr::str_to_title(interviewee) , 
+                  method = "Notes")  |> 
+  tidyr::separate(interviewee, into = c("first", "last"), #remove = FALSE, 
+                  sep = " ", extra = "drop", fill = "right") , 
+  code_references_interviews0[,1:6] |> 
+    dplyr::rename(interviewee = x1) |>
+    dplyr::rename_with(~ gsub("^[a-z]_|_\\d+$", "", .x)) |> 
+    dplyr::mutate( 
+      interviewee = gsub(pattern = "_Deedee_ ", replacement = "", x = interviewee), 
+      interviewee = gsub("^\\d+ : Files\\\\", "", interviewee), 
+      interviewee = gsub("[^[:alnum:]]", " ", interviewee), # 1. Replace special chars with space
+      interviewee = gsub("[^[:alpha:]]", " ", interviewee), 
+                         interviewee = trimws(interviewee), 
+      interviewee = stringr::str_to_title(interviewee)
+      ) |> 
+    tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "val") |>
+    dplyr::mutate(Theme = dplyr::case_when(
+      Theme %in% c("net", "boat", "fishing") ~ "net", 
+      Theme %in% c("salmon", "crab", "fish") ~ "fish", 
+      Theme == "change" ~ "change"
+    ))  |> 
+    dplyr::group_by(interviewee, cat) |> 
+    dplyr::summarise(val = sum(val, na.rm = TRUE)) |> 
+    tidyr::pivot_wider(id_cols = "interviewee", names_from = cat, values_from = val) |> 
+    dplyr::mutate(method = "Transcript")  |> 
+    tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
+                    sep = " ", extra = "drop", fill = "right") ) |>
+  tidyr::pivot_longer(cols = c(change, fish, net), names_to = "Theme", values_to = "Count") |>
+  dplyr::mutate(Count = replace_na(Count, 0), 
+                Theme = stringr::str_to_title(Theme)) |> 
+  dplyr::rename(Method = method, 
+                Interviewee = last) |> 
+  dplyr::arrange((Interviewee)) |>
+  dplyr::mutate(Interviewee = factor(Interviewee, levels = rev(unique(Interviewee))))
+
+expand_custom <- c(.005, .005)
+
+### dumbell/gap plot -----------------------------------------------------------
+
+# Percent Difference (The "Loss" Metric)
+# A simple but powerful descriptive statistic is the Mean Percentage Catch.
+# $$\text{Catch Rate} = \left( \frac{\sum \text{Count}_{\text{Notes}}}{\sum \text{Count}_{\text{Transcript}}} \right) \times 100$$
+# This tells you, for example, that "Notes only captured 15% of the total thematic density found in Transcripts."
+table_raw <- table_raw0
+
+catch_rate <- (sum(table_raw$Count[table_raw$Method == "Notes"], na.rm = TRUE)/sum(table_raw$Count[table_raw$Method == "Transcript"], na.rm = TRUE))*100
+
+# The Paired Comparison (Dumbbell Plot)This is the most effective visual for showing the "gap" for every single person.
+# Why it works: It shows the direction and magnitude of the difference simultaneously.
+
+# Pivot data to compare methods side-by-side
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = Count, 
+                y = Interviewee)) +
+  ggplot2::geom_line(aes(group = Interviewee), color = "grey80") +
+  ggplot2::geom_point(aes(color = Method), alpha = .7, size = 3) +
+  ggplot2::facet_wrap(~Theme) +
+  theme_custom() +
+  ggplot2::labs(title = "Discrepancy between Methods by Interviewee", 
+                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.") ) + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "-dumbell")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Relative Emphasis (Percentage Bar Chart) ----------------------------------
+
+# Transcripts will almost always have higher raw numbers because they are wordier. The real question is: Is the "flavor" of the data the same? If "Fish" makes up 50% of the transcript coding, does it also make up 50% of the notes coding?
+
+# Statistical Goal: Compare Proportional Composition.
+
+# The Look: 100% stacked bar chart showing the ratio of themes within each method.
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = Method, y = Count, fill = Theme)) +
+  ggplot2::geom_bar(stat = "identity", position = "fill") +
+  ggplot2::theme_minimal() +
+  theme_custom() +
+  # ggplot2::theme(bor)
+  ggplot2::labs(title = "Thematic Composition by Method", 
+                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.")) + 
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) +
+  ggplot2::scale_y_continuous(name = "Proportion of Thematic Coding", 
+                            expand = expand_custom, 
+                            labels = scales::percent) 
+
+nickname <- paste0(nickname0, "-percentage")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Correlation Analysis (Scatter Plot with Regression) ---------------------
+
+# Do the methods at least trend together? If an interviewee talks a lot about "fish" in the transcript, do the notes reflect that increase proportionally?
+
+# 1. Calculate the stats manually for each Theme
+stats_data <- table_raw |>
+  group_by(Theme) |>
+  do({
+    mod <- lm(Transcript ~ Notes, data = .)
+    # Create the label strings
+    data.frame(
+      intercept = coef(mod)[1],
+      slope = coef(mod)[2],
+      r2 = summary(mod)$r.squared,
+      label = paste0("y = ", round(coef(mod)[2], 2), "x + ", round(coef(mod)[1], 2), 
+                     "\nR² = ", round(summary(mod)$r.squared, 3))
+    )
+  }) |>
+  ungroup() |> 
+  dplyr::mutate(
+    label = ifelse(is.nan(r2), "", label), 
+    r2 = ifelse(is.nan(r2), "", r2))
+
+# 2. Plotting
+figure_print <- ggplot2::ggplot(
+  data = table_raw, 
+  mapping = aes(x = Notes, y = Transcript)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  # Add the text using the stats_data table
+  # We use Inf/-Inf to pin the text to the corners regardless of the scale
+  ggplot2::geom_text(data = stats_data, 
+            aes(x = -Inf, y = Inf, label = label), 
+            hjust = -0.1, vjust = 1.1, size = 3.5, inherit.aes = FALSE) +
+  ggplot2::facet_wrap(~Theme, scales = "free") +
+  ggplot2::theme_minimal() +
+  ggplot2::labs(title = "Correlation of Theme Density with Regression")
+
+nickname <- paste0(nickname0, "-correllation")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Paired Wilcoxon Signed-Rank Test -------------------------------------------
+
+# Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
+table_raw <- table_raw0 |>
+  tidyr::pivot_wider(names_from = Method, values_from = Count) |>
+  # Replace NAs with 0 in case an interviewee is missing in one method
+  dplyr::mutate(Notes = replace_na(Notes, 0),
+         Transcript = replace_na(Transcript, 0))
+
+# Run test for a specific theme (e.g., 'Fish')
+pp <- wilcox.test(table_raw$Transcript, table_raw$Notes, paired = TRUE)
+# Wilcoxon signed rank test with continuity correction
+# 
+# data:  table_raw$Transcript and table_raw$Notes
+# V = 1363.5, p-value = 1.914e-05
+# alternative hypothesis: true location shift is not equal to 0
+
+# 1. The Statistical Verdict
+
+# The p-value ($1.108 \times 10^{-5}$) is extremely small (well below the standard $0.05$ threshold).
+# Significant Difference: There is a statistically significant difference between the counts produced by the Transcript method and the Notes method.
+# Direction of Bias: Since $V = 1015.5$ is a high positive value in this context (assuming your Transcript counts are higher than Notes), it confirms that the Transcript method is yielding significantly more thematic density.The "So What?": You have statistical proof that relying solely on notes results in a significant "loss" of data volume compared to full transcription.
+# Figure: Since the Wilcoxon test proves a "location shift" (one is higher than the other), the best way to visualize this for a reader is a Boxplot with Significance Brackets. This makes the $p$-value result intuitive.
+
+library(ggpubr) # Great for adding p-values to plots
+table_raw <- table_raw0
+figure_print <- ggplot2::ggplot(table_raw, aes(x = Method, y = Count, fill = Method)) +
+  ggplot2::geom_boxplot(alpha = 0.7, width = 0.5) +
+  ggplot2::geom_jitter(width = 0.1, alpha = 0.3) + # Shows the individual interviewees
+  ggplot2::theme_minimal() +
+  ggplot2::scale_fill_manual(values = c("Notes" = "#E69F00", "Transcript" = "#56B4E9")) +
+  ggplot2::labs(
+    title = "Comparison of Coding Density",
+    subtitle = paste0("Wilcoxon Signed-Rank Test with Continuity Correction: p = ", formatC(pp$p.value, digits = 7, format = "f")),
+    y = "Number of Coding References"
+  ) +
+  ggplot2::theme(legend.position = "none") +
+  ggplot2::scale_color_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8)  + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, 
+    begin = .2, 
+    end = .8) 
+
+nickname <- paste0(nickname0, "-wilcoxon")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+### Spearman’s Rank Correlation ----------------------------------------------- 
+
+# ($\rho$)This measures consistency rather than raw volume. 
+# It answers: "If Interviewee A is the top person for 'Net' mentions in the Transcript, are they also the top person in the Notes?"
+# Interpretation: A high $\rho$ (e.g., $> 0.8$) suggests that while Notes might have fewer words, they capture the relative importance of themes correctly.
+
+
+### Bland-Altman Plot ------------------------------------------------------------
+# This is the gold standard for "Method Agreement" in statistics. 
+# It plots the Average of the two methods on the $x$-axis and the Difference on the $y$-axis.
+# Why it works: It reveals if the "Notes" method gets less accurate as the interview gets longer/more complex. 
+# If the dots fan out as you move right, it means Notes fail specifically in high-density interviews.
+
+# How to Read Your Result:
+#   The Bias (Blue Line): Since your Wilcoxon test was significant, this line will be above zero. This represents the average number of references "lost" when using notes instead of transcripts.
+# 
+# The "Fan" Effect (Heteroscedasticity): Check the shape of the points.
+# 
+# Consistent: If the dots stay in a horizontal band, your notes are equally reliable regardless of how much the interviewee talks.
+# 
+# Fanning Out: If the cloud of dots gets wider as you move to the right (higher Average), it means your notes become less reliable during very intense, high-density interviews.
+# 
+# Outliers: Any points outside the Red Dotted Lines (Limits of Agreement) are cases where the discrepancy between the two methods was unusually high.
+
+# 1. Prepare the data (assuming you have 'Notes' and 'Transcript' columns)
+table_raw <- table_raw0 |>
+  tidyr::pivot_wider(names_from = Method, values_from = Count) |>
+  # Replace NAs with 0 in case an interviewee is missing in one method
+  dplyr::mutate(Notes = replace_na(Notes, 0),
+                Transcript = replace_na(Transcript, 0))
+
+ba_data <- table_raw |>
+  mutate(
+    Avg  = (Transcript + Notes) / 2,
+    Diff = Transcript - Notes
+  )
+
+# 2. Calculate the statistical lines
+bias      <- mean(ba_data$Diff, na.rm = TRUE)
+sd_diff   <- sd(ba_data$Diff, na.rm = TRUE)
+upper_loa <- bias + (1.96 * sd_diff)
+lower_loa <- bias - (1.96 * sd_diff)
+
+# 3. Create the Plot
+figure_print <- ggplot(ba_data, aes(x = Avg, y = Diff)) +
+  geom_point(alpha = 0.6, size = 2) +
+  
+  # Horizontal line at 0 (Perfect Agreement)
+  geom_hline(yintercept = 0, linetype = "solid", color = "grey50") +
+  
+  # Bias line (The average gap)
+  geom_hline(yintercept = bias, linetype = "dashed", color = "blue", size = 0.8) +
+  
+  # Limits of Agreement (LoA)
+  geom_hline(yintercept = upper_loa, linetype = "dotted", color = "red") +
+  geom_hline(yintercept = lower_loa, linetype = "dotted", color = "red") +
+  
+  # Labels for the lines
+  annotate("text", x = max(ba_data$Avg), y = bias, label = "Bias", 
+           vjust = -1, hjust = 1, color = "blue") +
+  annotate("text", x = max(ba_data$Avg), y = upper_loa, label = "+1.96 SD", 
+           vjust = -1, hjust = 1, color = "red") +
+  annotate("text", x = max(ba_data$Avg), y = lower_loa, label = "-1.96 SD", 
+           vjust = 1.5, hjust = 1, color = "red") +
+  
+  theme_minimal() +
+  labs(
+    title = "Bland-Altman Plot: Agreement Analysis",
+    subtitle = "Assessing if method bias changes with coding density",
+    x = "Average of Transcript & Notes (Overall Density)",
+    y = "Difference (Transcript - Notes)"
+  ) +
+  facet_wrap(~Theme, scales = "free")
+
+nickname <- paste0(nickname0, "-blandaltman")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+
+##### Analysis
+# 1. The "Change" Theme: High Accuracy, Low Volume
+# The Look: The points are clustered very tightly near zero.
+# 
+# What it means: You are very accurate at capturing "Change." There is almost no difference between your notes and the transcript.
+# 
+# The Catch: This is likely because "Change" is a rare or very specific topic. When it comes up, you catch it. The bias (blue line) is small because there isn't much data to "lose."
+# 
+# 2. The "Fish" Theme: The "Classic" Note-Taking Gap
+# The Look: This is a textbook "fan" shape (heteroscedasticity). As the average mentions increase (moving right), the dots spread out vertically.
+# 
+# What it means: This is your most inconsistent category.
+# 
+# For short discussions about fish, you are accurate.
+# 
+# For long, dense discussions, your notes "drift." Sometimes you catch a lot (dots near 0), but sometimes you miss a huge amount (the dots near the bottom red line).
+# 
+# Verdict: Notes are a risky substitute for transcripts in this category if the interview is "fish-heavy."
+# 
+# 3. The "Net" Theme: Systemic Under-Reporting
+# The Look: Notice how the dots follow a clear upward diagonal trend. This is unusual for a Bland-Altman and very telling.
+# 
+# What it means: There is a proportional bias. The more an interviewee talks about "Nets," the more you fall behind in your notes at a constant rate.
+# 
+# Verdict: You aren't just "missing" things randomly; you are consistently capturing only a small fraction of the "Net" conversation. The transcript is exponentially richer here.
+
+### Bar plot of theme ------------------
 table_raw <- themes_notesonly0[,-1]
 names(table_raw) <- substr(x = names(table_raw),start = 3, stop = nchar(names(table_raw)))
 
@@ -917,7 +1978,6 @@ table_raw0 <- table_raw <- table_raw |>
   dplyr::mutate(var = gsub(x = var, pattern = "_", replacement = " "), 
                 var = stringr::str_to_title(var))
 
-### Bar plot of theme ------------------
 colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
 figure_print <- 
   ggplot2::ggplot(
@@ -1544,12 +2604,12 @@ width0 <- full_page_portrait_width
 
 table_raw <- table_raw0 <- 
   oralhistory_orig |>
-                     dplyr::mutate(id = as.numeric(paste0(id))) |> 
-                     dplyr::filter(location_category == "LOI") |> 
-                     dplyr::select(id, name = source, indigenous, indigenous00, 
-                                   fishing_experience, collection, demographic, 
-                                   region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score, change_score)  |>
+  dplyr::mutate(id = as.numeric(paste0(id))) |> 
+  dplyr::filter(location_category == "LOI") |> 
+  dplyr::select(id, name = source, indigenous, indigenous00, 
+                fishing_experience, collection, demographic, 
+                region30, region30_desc, region100, region100_desc, 
+                change_score_language, emotional_score, change_score)  |>
   tidyr::pivot_longer(cols = change_score_language:change_score, names_to = "cat", values_to = "freq") |> 
   dplyr::mutate(cat = stringr::str_to_title(cat), 
                 cat = gsub(pattern = "_", replacement = " ", x = cat)) 
