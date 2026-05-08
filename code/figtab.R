@@ -58,32 +58,19 @@ for (p in PKG) {
 
 # Load data --------------------------------------------------------------------
 
-#XLSX
-a <- list.files(path = here::here("data"), 
-                full.names = TRUE, recursive = FALSE, pattern = ".xlsx")
+library(googledrive)
+googledrive::drive_auth()
+2
+googledrive::drive_download(
+  file = googledrive::as_id("https://docs.google.com/spreadsheets/d/1T5E2qmzUWbS6bmiI7FAP9UlVwA1Rbfyu_ORYDhS9Ujs"), 
+  path = here::here("data","data_analysis.xlsx"), 
+  overwrite = TRUE)
 
-for (i in 1:length(a)){
-  b <- readxl::read_xlsx(path = a[i], sheet = 1)
-  b <- janitor::clean_names(b)
-  temp <- strsplit(x = a[i], split = "/")
-  temp <- gsub(pattern = "\\.xlsx", replacement = "", x = temp[[1]][length(temp[[1]])])
-  temp <- tolower(temp)
-  assign(x = paste0(temp, "0"), value = b)
-  print(paste0("Loaded: ", temp, "0"))
-}
+sheets <- readxl::excel_sheets(here::here("data","data_analysis.xlsx"))
 
-# CSVs
-a <- list.files(path = here::here("data"), 
-                full.names = TRUE, recursive = FALSE, pattern = ".csv")
-
-for (i in 1:length(a)){
-  b <- readr::read_csv(file = a[i], show_col_types = FALSE)
-  b <- janitor::clean_names(b)
-  temp <- strsplit(x = a[i], split = "/")
-  temp <- gsub(pattern = "\\.csv", replacement = "", x = temp[[1]][length(temp[[1]])])
-  temp <- tolower(temp)
-  assign(x = paste0(temp, "0"), value = b)
-  print(paste0("Loaded: ", temp, "0"))
+for (ii in sheets){
+  temp <- readxl::read_excel(path = here::here("data","data_analysis.xlsx"), sheet = ii)
+  assign(x = paste0(ii, "0"), value = temp)
 }
 
 # Wrangle Data -----------------------------------------------------------------
@@ -157,92 +144,30 @@ place_labels <- data.frame(
                crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") |>
   sf::st_transform(crs = crs_out) 
 
-## oralhistory_orig ----------------------------------------------------
 
-# oralhistory_ref <- oral_histories_original0 |> 
-#   dplyr::select(source, date, link, id, word_count, weighted_percent, percent_category) |> 
-#   dplyr::distinct() 
-# write_csv(x = oralhistory_ref, file = "data/oralhistory_ref.csv", col_names = TRUE)
+demographics0 <- demographics0 |> 
+  dplyr::mutate(
+    env_change_openness = factor(x = env_change_openness, 
+                                 levels = c("Low", "Medium", "High" ), 
+                                 labels = c("Low", "Medium", "High" ), 
+                                 ordered = TRUE), 
+    emotional_level = factor(x = emotional_level, 
+                             levels = c("Low", "Medium", "High" ), 
+                             labels = c("Low", "Medium", "High" ), 
+                             ordered = TRUE), 
+    change_language = factor(x = change_language, 
+                             levels = c("Low", "Medium", "High" ), 
+                             labels = c("Low", "Medium", "High" ), 
+                             ordered = TRUE)
+  )
 
-oralhistory_orig <- oral_histories_original0  |> 
-  dplyr::mutate(interviewee = source, 
-                # interviewee = gsub("[1-9]+ : Files\\\\\\\\", "", interviewee), 
-                # interviewee = gsub("1[0-9]+ : Files\\\\\\\\", "", interviewee), 
-                # interviewee = gsub("2[0-9]+ : Files\\\\\\\\", "", interviewee), 
-                interviewee = gsub(",", " ", interviewee), 
-                interviewee = stringr::str_to_title(interviewee))  |> 
-  tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
-                  sep = " ", extra = "drop", fill = "right")  |> 
+locations0 <- locations0   |> 
   sf::st_as_sf(coords = c("longitude", "latitude"), 
                remove = FALSE,
-               crs = crs_in) |>
-  sf::st_transform(crs = crs_out) |> 
-  dplyr::mutate(id = factor(id, ordered = TRUE), 
-                location_category = ifelse(location_category == "Oregon", "LOI", location_category), 
-                location_category = ifelse(objectid == 12, "Additional", location_category),
-                location_category0 = dplyr::case_when(
-                  location_category == "LOI" ~ "Location of Interview", 
-                  location_category == "Additional" ~ "Mentioned in Interview", 
-                  location_category == "Oregon" ~ "Location of Interview", 
-                ) )
-
-oralhistory_orig <- oralhistory_orig |> 
-  dplyr::bind_cols(st_coordinates(oralhistory_orig))
-
-oralhistory_ref <- oralhistory_ref_edited0  |> 
-  dplyr::select(-word_count, -weighted_percent, -source, 
-                -date, -link, -percent_category) |> 
-  dplyr::rename(change_score_old = change_score, 
-                change_score_language_old = change_score_language, 
-                emotional_score_old = emotional_score) |> 
-  dplyr::mutate(id = factor(id, ordered = TRUE), 
-                source_fl = gsub(pattern = ",", replacement = "", x = source_fl),
-                indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous")) |> 
-  tidyr::separate(source_fl, into = c("first", "last"), #remove = FALSE, 
-                  sep = " ", extra = "drop", fill = "right") |> 
-  dplyr::full_join(ohp_table2_manualcoding0 |>
-                     dplyr::mutate(
-                       gsub(pattern = ", Carla, and Judy Jo", replacement = "", x = oral_history),
-                       gsub(pattern = " Ann", replacement = "", x = oral_history),
-                       oral_history = gsub(pattern = ",", replacement = "", x = oral_history)) |> 
-                     tidyr::separate(oral_history, into = c("first", "last"), #remove = FALSE, 
-                                     sep = " ", extra = "drop", fill = "right") ) |> 
-  dplyr::rename(change_score_language = env_change_openness_1_3, 
-                change_score = change_language_1_3, 
-                emotional_score = emotional_level_1_3) |> 
-  dplyr::mutate(change_score_language = dplyr::case_when(
-                  change_score_language == 1 ~ "Low",
-                  change_score_language == 2 ~ "Medium",
-                  change_score_language == 3 ~ "High"
-                ), 
-                emotional_score = dplyr::case_when(
-                  emotional_score == 1 ~ "Low",
-                  emotional_score == 2 ~ "Medium",
-                  emotional_score == 3 ~ "High"
-                ), 
-                change_score = dplyr::case_when(
-                  change_score == 1 ~ "Low",
-                  change_score == 2 ~ "Medium",
-                  change_score == 3 ~ "High"
-                ), 
-                change_score_language = factor(x = change_score_language, 
-                                               levels = c("Low", "Medium", "High" ), 
-                                               labels = c("Low", "Medium", "High" ), 
-                                               ordered = TRUE), 
-                emotional_score = factor(x = emotional_score, 
-                                         levels = c("Low", "Medium", "High" ), 
-                                         labels = c("Low", "Medium", "High" ), 
-                                         ordered = TRUE), 
-                change_score = factor(x = change_score, 
-                                      levels = c("Low", "Medium", "High" ), 
-                                      labels = c("Low", "Medium", "High" ), 
-                                      ordered = TRUE) ) |> 
-  dplyr::left_join(oralhistory_orig |> 
-                     dplyr::filter(location_category == "LOI"))
-
+               crs = crs_in) 
 # https://stackoverflow.com/questions/77179007/group-spatial-points-by-distance-in-r-how-to-group-cluster-spatial-points-so-gr
 dist0 <- 100000 # example : 11000
-adj <- sf::st_distance(oralhistory_orig) 
+adj <- sf::st_distance(locations0) 
 # Furthermore, we can turn this into a binary matrix telling us whether each pair of stations is within 11km of each other:
 adj <- matrix(as.numeric(as.numeric(adj)) < dist0, nrow = nrow(adj))
 # We will see if we plot this graph, there are 4 connected components, representing clusters of stations within 11km of each other:
@@ -250,11 +175,11 @@ g100 <- igraph::graph_from_adjacency_matrix(adj)
 # We can get the number of these components and put these back into our original data frame:
 
 dist0 <- 30000 # example : 11000
-adj <- sf::st_distance(oralhistory_orig)
+adj <- sf::st_distance(locations0)
 adj <- matrix(as.numeric(as.numeric(adj)) < dist0, nrow = nrow(adj))
 g30 <- igraph::graph_from_adjacency_matrix(adj)
 
-oralhistory_orig <- oralhistory_orig |> 
+locations0 <- locations0 |> 
   dplyr::mutate(
     region100 = factor(components(g100)$membership), 
     region100_desc  = dplyr::case_when(
@@ -289,49 +214,15 @@ oralhistory_orig <- oralhistory_orig |>
     ),
     region = region100, 
     region_desc = region100_desc) |> 
-  dplyr::right_join(oralhistory_ref)
+  dplyr::right_join(demographics0)
 
+demographics0 <- dplyr::left_join(
+  demographics0, 
+  locations0 |> 
+    dplyr::filter(location_category0 == "LOI") |>
+    sf::st_drop_geometry() |> 
+    dplyr::select(last, region100, region100_desc, region30, region30_desc, region, region_desc))
 
-if (FALSE) { # test
-  # ggplot() +  geom_sf(data = oralhistory_orig, aes(color = region)) 
-  
-  ggplot2::ggplot() + # data = table_raw) +
-    ggplot2::geom_sf(data = world_coordinates,
-                     fill = "grey70",
-                     color = "grey80")  + 
-    # Manage Axis extents (limits) and breaks
-    ggplot2::scale_x_continuous(name = "Longitude °W",
-                                breaks = seq(-180, -150, 2)) +
-    ggplot2::scale_y_continuous(name = "Latitude °N",
-                                breaks = seq(50, 65, 2)) + # seq(52, 62, 2)
-    ggplot2::geom_sf_text(
-      data = place_labels |> dplyr::filter(type == "mainland"),
-      mapping = aes(label = lab, angle = angle), 
-      color = "grey60", 
-      size = 3, 
-      show.legend = FALSE) + 
-    ggplot2::geom_sf_text(
-      data = place_labels |> dplyr::filter(type == "survey"),
-      mapping = aes(label = lab, angle = angle), 
-      color = "black",
-      fontface = "bold",
-      size = 2, 
-      show.legend = FALSE) + 
-    ggplot2::geom_sf_text(
-      data = place_labels |> dplyr::filter(!(type %in% c("mainland", "survey"))),
-      mapping = aes(label = lab, angle = angle), 
-      color = "grey10", 
-      fontface = "italic", 
-      size = 2, 
-      show.legend = FALSE)  +  
-    ggplot2::geom_sf_label(
-      data = oralhistory_orig,
-      mapping = aes(label = region), 
-      show.legend = FALSE)  +  
-    # geom_sf(data = oralhistory_orig, aes(color = region))  +
-    ggplot2::coord_sf(xlim = c(min(oralhistory_orig$X)-25000, max(oralhistory_orig$X)+25000),
-                      ylim = c(min(oralhistory_orig$Y)-25000, max(oralhistory_orig$Y)+25000))
-}
 # Aesthetics -------------------------------------------------------------------
 
 full_page_portrait_width <- 6.5
@@ -342,6 +233,12 @@ negative <- "#EDA247"
 positive <- "#57C4AD"
 neutral <- "#E6E1BC"
 
+expand_custom <- c(.005, .005)
+
+## NOTES ------
+# Color choices begin = 0.2, end = 0.8
+### G/mako - Themes
+### E/cviridis - Counts/Frequencies
 # Functions --------------------------------------------------------------------
 
 theme_custom <- function() {
@@ -538,7 +435,7 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
     ## PCA -------------------------------  
     # 1. Reshape data to wide format (one row per ID, columns = categories)
     table_raw <- table_raw0 |> 
-      tidyr::drop_na() |> 
+      # tidyr::drop_na() |> 
       sf::st_drop_geometry() |> 
       dplyr::rename(var00 = {{var000}}) |> 
       tidyr::pivot_wider(
@@ -557,7 +454,7 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
         PC2 = pca_res$x[, 2]
       )
     
-    # 4. Make PCA scatter plot colored by indigenous00
+    # 4. Make PCA scatter plot colored by indigenous_status
     colors0 <- viridis::mako(length(unique(table_raw$var00)), direction = -1, begin = 0.2, end = .8)
     
     # figure_print <- figure_print_pca <- 
@@ -612,21 +509,21 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
     # https://steverxd.github.io/Stat_tests/three-or-more-means.html
     # two ways of doing the same thing: anova and lm
     
-    ## Anova -----------------------------------------
-    table_aov <- car::Anova(aov(freq ~ fishing_experience + cat, data = table_raw0))
-    
-    ## Linear mixed-effects model -------------------------------
-    table_lm <- table_raw0 |> 
-      dplyr::rename(var00 = {{var000}}) |> 
-      dplyr::mutate(id = as.numeric(paste0(id)))
-    # table_lm <- lm(freq ~ var00 + cat + (1 | id), data = table_lm)
-    table_lm <- lme4::lmer(freq ~ var00 + cat + (1 | id), data = table_lm)
-    # + (1 | id) ==> Each person gets their own baseline level of freq.
-    
-    # table_lm <- lm0 |> summary() |> print(digits = 8) # show summary output
-    
-    table_lm_comb <- c(table_lm_comb, table_lm)
-    names(table_lm_comb)[length(table_lm_comb)] <- x_name0
+    # ## Anova -----------------------------------------
+    # table_aov <- car::Anova(aov(freq ~ cat + cat, data = table_raw0))
+    # 
+    # ## Linear mixed-effects model -------------------------------
+    # table_lm <- table_raw0 |> 
+    #   dplyr::rename(var00 = {{var000}}) |> 
+    #   dplyr::mutate(id = as.numeric(paste0(id)))
+    # # table_lm <- lm(freq ~ var00 + cat + (1 | id), data = table_lm)
+    # table_lm <- lme4::lmer(freq ~ var00 + cat + (1 | id), data = table_lm)
+    # # + (1 | id) ==> Each person gets their own baseline level of freq.
+    # 
+    # # table_lm <- lm0 |> summary() |> print(digits = 8) # show summary output
+    # 
+    # table_lm_comb <- c(table_lm_comb, table_lm)
+    # names(table_lm_comb)[length(table_lm_comb)] <- x_name0
     
   }
   
@@ -810,38 +707,24 @@ plot_tileheat <- function(table_raw0, nickname0, facet_var = NULL) {
 }
 
 
-# Prep figures -----------------------------------------------------------------
+# Prepare figures --------------------------------------------------------------
 
-## NOTES ------
-
-# Color choices begin = 0.2, end = 0.8
-### G/mako - Themes
-### E/cviridis - Counts/Frequencies
-
-expand_custom <- c(.005, .005)
-
-## Figure 1: Hierarchical plot of themes -----------------------------------------------
+## Figure 1: Hierarchical plot of themes ---------------------------------------
 
 nickname0 <- "fig-1-hierarchical-themes-"
 
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_landscape_width
 
-table_raw0 <- dplyr::bind_rows(
-  autocoded_themes_transcripts0 |> 
-    dplyr::mutate(method = "Transcript") |>
-    # head() |> 
-    dplyr::mutate(codes = gsub(pattern = "Codes\\\\transcripts\\\\",
-                               replacement = "", x = codes, fixed = TRUE)), 
-  autocoded_themes_notes0 |> 
-    # head() |> 
-    dplyr::mutate(method = "Notes") |>
-    dplyr::mutate(codes = gsub(pattern = "Codes\\\\notes_themes\\\\",
-                               replacement = "", x = codes, fixed = TRUE)) ) |> 
-  tidyr::separate(codes, into = c("theme", "node"), sep = "\\\\") |> 
-  dplyr::select(Theme = theme, node, number_of_coding_references, method) |> 
-  dplyr::ungroup()
-
+table_raw0 <- autocoded_by_theme_node0 |> 
+  dplyr::rename(Count = number_of_coding_references, 
+                Theme = theme, 
+                Node = node, 
+                Method = method) |> 
+  # dplyr::filter(Method != "NVivo_Notes") |> 
+  dplyr::mutate(Method = ifelse(Method == "NVivo_Transcript", "Transcript", Method), 
+                Method = ifelse(Method == "NVivo_Notes", "Notes", Method), 
+                Theme = stringr::str_to_sentence(Theme))
 
 ### Treemap -------------------------------------------------------------------
 # A treemap is excellent for showing the relative "weight" of nodes within a theme. We use subgroup to create the visual borders between "boat" and "change."
@@ -849,28 +732,28 @@ library(treemapify)
 # table_raw <- table_raw0 |>
 #   # 1. Group by everything except value to consolidate duplicates
 #   dplyr::group_by(method, Theme, node) |>
-#   dplyr::summarise(number_of_coding_references = sum(number_of_coding_references), .groups = "drop") |>
+#   dplyr::summarise(Count = sum(Count), .groups = "drop") |>
 #   # 2. Filter out nodes that appear fewer than (e.g.) 3 times
-#   dplyr::filter(number_of_coding_references >= 2)
+#   dplyr::filter(Count >= 2)
 
 # # Including phrases with greater than 1 node
 # table_raw <- dplyr::bind_rows(
 #   table_raw0 |> 
-#     dplyr::filter(number_of_coding_references > 1), 
+#     dplyr::filter(Count > 1), 
 #   table_raw0 |>
-#     dplyr::filter(number_of_coding_references == 1) |>
+#     dplyr::filter(Count == 1) |>
 #     dplyr::group_by(method, Theme) |>
-#     dplyr::summarise(number_of_coding_references = sum(number_of_coding_references), .groups = "drop") |>
+#     dplyr::summarise(Count = sum(Count), .groups = "drop") |>
 #     dplyr::mutate(node = "other")) |> 
-#   dplyr::rename(number_of_coding_references = number_of_coding_references)
+#   dplyr::rename(Count = Count)
 
 table_raw <- table_raw0
 
 figure_print <- ggplot2::ggplot(
   data = table_raw, 
-  mapping = aes(area = number_of_coding_references, 
+  mapping = aes(area = Count, 
                 fill = Theme, 
-                label = node, 
+                label = Node, 
                 subgroup = Theme)) +
   treemapify::geom_treemap() +
   # Add white borders around the themes
@@ -890,7 +773,7 @@ figure_print <- ggplot2::ggplot(
   # ggplot2::labs(title = "Hierarchy Treemap", 
   #               subtitle = "Including phrases with greater than 1 node") +
   ggplot2::facet_wrap(
-    ~ method, 
+    ~ Method, 
     ncol = 1, 
     strip.position = "left") +
   ggplot2::guides(
@@ -921,30 +804,30 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # 1. Prepare data for faceted rings by Method
 # Level 1: Theme (Inner ring)
 lev1 <- table_raw0 |>
-  dplyr::group_by(method, Theme) |>
-  dplyr::summarise(value = sum(number_of_coding_references), .groups = "drop") |>
+  dplyr::group_by(Method, Theme) |>
+  dplyr::summarise(value = sum(Count), .groups = "drop") |>
   dplyr::mutate(level = 1, 
                 label = Theme)
 
 # Level 2: Node (Outer ring)
 lev2 <- table_raw0 |>
   dplyr::mutate(level = 2, 
-                label = node, 
-                value = number_of_coding_references)
+                label = Node, 
+                value = Count)
 
 # 2. Combine and calculate together
 table_raw <- dplyr::bind_rows(lev1, lev2) |>
-  dplyr::arrange(method, level, Theme, label) |>
+  dplyr::arrange(Method, level, Theme, label) |>
   dplyr::mutate(Theme = factor(Theme), 
                 label = factor(label)) |>
   # 1. Calculate the TOTAL refs for each method to find the overall max
-  dplyr::group_by(method) |>
+  dplyr::group_by(Method) |>
   dplyr::mutate(method_max = sum(value[level == 2])) |> 
   dplyr::ungroup() |>
   # 2. Identify the global maximum (the Transcript total)
   dplyr::mutate(global_total = max(method_max)) |>
   # 3. Calculate positions relative to the GLOBAL total
-  dplyr::group_by(method, level) |>
+  dplyr::group_by(Method, level) |>
   dplyr::mutate(
     facet_total = sum(value),
     running_total = cumsum(value),
@@ -977,8 +860,8 @@ figure_print <-
   
   # CENTER TITLE
   ggplot2::geom_text(
-    data = table_raw |> dplyr::distinct(method),
-    mapping = aes(x = 0, y = 0, label = method),
+    data = table_raw |> dplyr::distinct(Method),
+    mapping = aes(x = 0, y = 0, label = Method),
     inherit.aes = FALSE, 
     size = 5, 
     fontface = "bold") +
@@ -1011,7 +894,7 @@ figure_print <-
   ggplot2::coord_polar(
     theta = "y", 
     clip = "off") + 
-  ggplot2::facet_wrap(~ method, scales = "fixed") + 
+  ggplot2::facet_wrap(~ Method, scales = "fixed") + 
   theme_custom() +
   ggplot2::theme_void() +
   ggplot2::theme(
@@ -1067,10 +950,10 @@ table_raw <- table_raw0 |>
 
 figure_print <- ggplot2::ggplot(
   data = table_raw,
-  mapping = aes(y = number_of_coding_references, 
-                axis1 = method, 
+  mapping = aes(y = Count, 
+                axis1 = Method, 
                 axis2 = Theme, 
-                axis3 = node)) +
+                axis3 = Node)) +
   ggalluvial::geom_alluvium(
     mapping = aes(fill = Theme), 
     width = 1/12) +
@@ -1081,7 +964,7 @@ figure_print <- ggplot2::ggplot(
   # 1. Labels for Method and Theme (Rotated 90)
   ggplot2::geom_text(
     stat = "stratum", 
-    aes(label = after_stat(ifelse(stratum %in% table_raw$node, NA, as.character(stratum)))), 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$Node, NA, as.character(stratum)))), 
     size = 3, 
     angle = 90,
     na.rm = TRUE
@@ -1090,7 +973,7 @@ figure_print <- ggplot2::ggplot(
   # 2. Labels for Node (Horizontal)
   ggplot2::geom_text(
     stat = "stratum", 
-    aes(label = after_stat(ifelse(stratum %in% table_raw$node, as.character(stratum), NA))), 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$Node, as.character(stratum), NA))), 
     size = 2.5, 
     angle = 0, # Horizontal
     hjust = 1, # 1 = Right justified
@@ -1126,10 +1009,10 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 figure_print <- ggplot2::ggplot(
   data = table_raw,
-  mapping = aes(y = number_of_coding_references, 
+  mapping = aes(y = Count, 
                 # axis1 = method, 
                 axis2 = Theme, 
-                axis3 = node)) +
+                axis3 = Node)) +
   ggalluvial::geom_alluvium(
     mapping = aes(fill = Theme), 
     width = 1/12) +
@@ -1140,7 +1023,7 @@ figure_print <- ggplot2::ggplot(
   # 1. Labels for Method and Theme (Rotated 90)
   ggplot2::geom_text(
     stat = "stratum", 
-    aes(label = after_stat(ifelse(stratum %in% table_raw$node, NA, as.character(stratum)))), 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$Node, NA, as.character(stratum)))), 
     size = 3, 
     angle = 90,
     na.rm = TRUE
@@ -1149,7 +1032,7 @@ figure_print <- ggplot2::ggplot(
   # 2. Labels for Node (Horizontal)
   ggplot2::geom_text(
     stat = "stratum", 
-    aes(label = after_stat(ifelse(stratum %in% table_raw$node, as.character(stratum), NA))), 
+    aes(label = after_stat(ifelse(stratum %in% table_raw$Node, as.character(stratum), NA))), 
     size = 2.5, 
     hjust = 1, # 1 = Right justified
     nudge_x = 0.04,     # Adjust this decimal to move text closer to/further from the right line
@@ -1174,7 +1057,7 @@ figure_print <- ggplot2::ggplot(
     ), 
     legend.position = "none") + 
   ggplot2::facet_wrap(
-    ~ method, 
+    ~ Method, 
     scales = "free_y", 
     ncol = 1, 
     strip.position = "left") + 
@@ -1199,9 +1082,9 @@ table_raw <- table_raw0
 # 1. Plotting the statistical distribution of nodes within each Theme
 figure_print <- ggplot2::ggplot(
   data = table_raw, 
-  mapping = aes(x = reorder(Theme, number_of_coding_references, FUN = median), 
-                y = number_of_coding_references, 
-                fill = method)) +
+  mapping = aes(x = reorder(Theme, Count, FUN = median), 
+                y = Count, 
+                fill = Method)) +
   # 'position_dodge' puts the boxplots side-by-side for each Theme
   ggplot2::geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.7, outlier.size = 1) +
   
@@ -1232,7 +1115,7 @@ figure_print <- ggplot2::ggplot(
     fill = "Method"
   )
 
-nickname <- paste0(nickname0, "boxandwhisker")
+nickname <- paste0(nickname0, "boxwhisker")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = full_page_portrait_width, height = full_page_portrait_height)
 
 
@@ -1241,14 +1124,13 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 nickname0 <- paste0(nickname0, "summarizedthemes-")
 
 table_raw0 <- table_raw0 |> 
-  dplyr::rename(Method = method, Count = number_of_coding_references) |> 
   dplyr::mutate(Theme = dplyr::case_when(
-    Theme %in% c("net", "boat", "fishing") ~ "net", 
-    Theme %in% c("salmon", "crab", "fish") ~ "fish", 
-    Theme == "change" ~ "change"
+    Theme %in% c("Net", "Boat", "Fishing") ~ "Net", 
+    Theme %in% c("Salmon", "Crab", "Fish") ~ "Fish", 
+    Theme == "Change" ~ "Change"
   ))  # |> 
 # dplyr::group_by(Theme, Method) |> 
-# dplyr::summarise(Count = sum(number_of_coding_references, na.rm = TRUE), 
+# dplyr::summarise(Count = sum(Count, na.rm = TRUE), 
 #                  ) #|> 
 # tidyr::pivot_wider(id_cols = "Theme", names_from = Method, values_from = Count) 
 
@@ -1262,7 +1144,7 @@ expand_custom <- c(.005, .005)
 # This tells you, for example, that "Notes only captured 15% of the total thematic density found in Transcripts."
 table_raw <- table_raw0
 
-catch_rate <- (sum(table_raw$Count[table_raw$Method == "Notes"], na.rm = TRUE)/sum(table_raw$Count[table_raw$Method == "Transcript"], na.rm = TRUE))*100
+# catch_rate <- (sum(table_raw$Count[table_raw$Method == "Notes"], na.rm = TRUE)/sum(table_raw$Count[table_raw$Method == "Transcript"], na.rm = TRUE))*100
 
 # The Paired Comparison (Dumbbell Plot)This is the most effective visual for showing the "gap" for every single person.
 # Why it works: It shows the direction and magnitude of the difference simultaneously.
@@ -1277,8 +1159,10 @@ figure_print <- ggplot2::ggplot(
   ggplot2::geom_point(aes(color = Method), alpha = .7, size = 3) +
   # ggplot2::facet_wrap(~Theme) +
   theme_custom() +
-  ggplot2::labs(title = "Discrepancy between Methods by Interviewee", 
-                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.") ) + 
+  ggplot2::labs(title = "Discrepancy between Methods by Interviewee"#, 
+                # subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),
+                #                   "% of the total thematic density found in the Transcript method.") 
+                ) + 
   ggplot2::scale_color_viridis_d(
     option = "D", 
     direction = -1, 
@@ -1308,8 +1192,10 @@ figure_print <- ggplot2::ggplot(
   ggplot2::theme_minimal() +
   theme_custom() +
   # ggplot2::theme(bor)
-  ggplot2::labs(title = "Thematic Composition by Method", 
-                subtitle = paste0("The notes method only captured ",round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.")) + 
+  ggplot2::labs(title = "Thematic Composition by Method"#, 
+                # subtitle = paste0("The notes method only captured ",
+                # round(catch_rate, digits = 1),"% of the total thematic density found in the Transcript method.")
+                ) + 
   ggplot2::scale_color_viridis_d(
     option = "D", 
     direction = -1, 
@@ -1375,10 +1261,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
 table_raw <- table_raw0 |>
-  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
-  # Replace NAs with 0 in case an interviewee is missing in one method
-  dplyr::mutate(Notes = replace_na(Notes, 0),
-                Transcript = replace_na(Transcript, 0))
+  tidyr::pivot_wider(id_cols = c(Theme, Node), names_from = Method, values_from = Count, values_fn = sum, values_fill = 0) 
 
 # Run test for a specific theme (e.g., 'Fish')
 pp <- wilcox.test(table_raw$Transcript, table_raw$Notes, paired = TRUE)
@@ -1448,10 +1331,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # 1. Prepare the data (assuming you have 'Notes' and 'Transcript' columns)
 table_raw <- table_raw0 |>
-  tidyr::pivot_wider(id_cols = c(Theme, node), names_from = Method, values_from = Count, values_fn = sum) |>
-  # Replace NAs with 0 in case an interviewee is missing in one method
-  dplyr::mutate(Notes = replace_na(Notes, 0),
-                Transcript = replace_na(Transcript, 0))
+  tidyr::pivot_wider(id_cols = c(Theme, Node), names_from = Method, values_from = Count, values_fn = sum, values_fill = 0) 
 
 ba_data <- table_raw |>
   mutate(
@@ -1525,65 +1405,22 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # 
 # Verdict: You aren't just "missing" things randomly; you are consistently capturing only a small fraction of the "Net" conversation. The transcript is exponentially richer here.
 
-### Bar plot of theme ------------------
-table_raw <- themes_notesonly0[,-1]
-names(table_raw) <- substr(x = names(table_raw),start = 3, stop = nchar(names(table_raw)))
-
-table_raw0 <- table_raw <- table_raw |>
-  # dplyr::select(-x1) |> 
-  tidyr::pivot_longer(names_to = "var", values_to = "val", cols = names(table_raw)) |> 
-  dplyr::mutate(var = gsub(x = var, pattern = "_", replacement = " "), 
-                var = stringr::str_to_title(var))
-
-colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
-figure_print <- 
-  ggplot2::ggplot(
-    data = table_raw, 
-    mapping = aes(x = var, y = val, fill = var)) +
-  ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
-  ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
-                             values = colors0, 
-                             expand = expand_custom) +
-  ggplot2::scale_y_continuous(name = "Coded Themes from Research Notes", 
-                              breaks = scales::pretty_breaks(), 
-                              expand = expand_custom) +
-  ggplot2::scale_x_discrete(name = "Themes") +
-  theme_custom() 
-nickname <- paste0(nickname0)
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
-
 ## Figure 2: bar chart of themes -----------------------------------------------
 
 nickname0 <- "fig-2-bar-themes"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-table_raw <- code_references_interviews0[,1:6] 
-names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
-
-table_raw0 <- table_raw <- table_raw |> 
-  dplyr::mutate(
-    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2)))# , 
-    # name = substr(x = x1, start = 12, stop = nchar(x1)), 
-    # name = gsub(pattern = "\\\\", replacement = "", x = name), 
-    # name = gsub(pattern = "_", replacement = " ", x = name), 
-    # name = gsub(pattern = "-", replacement = " ", x = name), 
-    # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
-    # name = stringr::str_to_title(name)
-  ) |> 
-  dplyr::select(-x1) |> 
-  dplyr::left_join(oralhistory_orig |> 
+table_raw <- autocoded_theme_by_interview0 |> 
+  dplyr::left_join(locations0 |> 
                      dplyr::filter(location_category == "LOI") |>
-                     dplyr::mutate(id = as.numeric(paste0(id))) |> 
-                     dplyr::select(id, name = source, 
-                                   indigenous, indigenous00, 
+                     # dplyr::mutate(id = as.numeric(paste0(id))) |> 
+                     dplyr::select(last, 
+                                   indigenous, indigenous_status, 
                                    fishing_experience, collection, demographic, 
                                    region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score)) |>
-  tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_title(cat), , 
-                id = factor(id, ordered = TRUE))
+                                   env_change_openness, emotional_level)) |> 
+  dplyr::mutate(id = dplyr::row_number())
 
 table_raw_rect <- table_raw |> 
   dplyr::select(id) |>
@@ -1592,16 +1429,18 @@ table_raw_rect <- table_raw |>
     xmin = id - 0.45, # approx start of group
     xmax = id + 0.45,  # approx end of group
     ymin = 0, 
-    ymax = max(table_raw$freq)
+    ymax = max(table_raw$Count)
   )
 
-colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
+colors0 <- viridis::mako(length(unique(table_raw$Theme)), direction = -1, begin = 0.2, end = .8)
 
 ### Grouped bar plot by narrator name with grouping rectangle ------------------
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
-    mapping = aes(x = name, y = freq, fill = cat)) +
+    mapping = aes(x = id, 
+                  y = Count, 
+                  fill = Theme)) +
   ggplot2::geom_bar(position="dodge", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
@@ -1620,7 +1459,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
-    mapping = aes(x = id, y = freq, fill = cat)) +
+    mapping = aes(x = id, y = Count, fill = Theme)) +
   ggplot2::geom_bar(position="dodge", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
@@ -1649,7 +1488,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
-    mapping = aes(x = id, y = freq, fill = cat)) +
+    mapping = aes(x = id, y = Count, fill = Theme)) +
   ggplot2::geom_bar(position="stack", stat="identity") +
   ggplot2::scale_fill_manual(name = "Theme", # "Temperature",
                              values = colors0) +
@@ -1660,33 +1499,6 @@ figure_print <-
   theme_custom() 
 nickname <- paste0(nickname0, "stackedid")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
-### pca/lm/Stacked by [var] -----------------------------------------
-
-# Does frequency differ by region and by category?
-
-temp <- plot_lm_pca_stacked(
-  table_raw0 = table_raw0, 
-  var00 = c("region100_desc","fishing_experience", "collection", "indigenous00"),
-  x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
-  nickname0 = nickname0) 
-
-a <- temp$table_lm_comb
-anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
-
-# Data: table_lm
-# Models:
-#   a$`Indigenous Status`: freq ~ var00 + cat + (1 | id)
-# a$`Fishing Experience`: freq ~ var00 + cat + (1 | id)
-# a$Region: freq ~ var00 + cat + (1 | id)
-# a$`Oral History Collection`: freq ~ var00 + cat + (1 | id)
-# npar    AIC    BIC  logLik -2*log(L)  Chisq Df Pr(>Chisq)
-# a$`Indigenous Status`          8 593.68 615.98 -288.84    577.68                     
-# a$`Fishing Experience`         9 596.15 621.24 -289.08    578.15 0.0000  1     1.0000
-# a$Region                      10 597.11 624.99 -288.56    577.11 1.0411  1     0.3076
-# a$`Oral History Collection`   10 596.77 624.64 -288.38    576.77 0.3438  0
-
-# The model including Indigenous status provides the best overall fit to the data (lowest AIC), suggesting it explains slightly more variation in how frequently different fishing-related categories are mentioned than the other grouping variables. Adding fishing experience, region, or oral history collection does not significantly improve model fit relative to the Indigenous-status model (likelihood ratio tests all non-significant, p ≥ 0.31). This indicates that, after accounting for the type of fishing-related category and repeated observations within individuals, differences in mention frequency are more strongly structured by Indigenous status than by region, fishing experience, or collection source, and that these latter factors do not contribute substantial additional explanatory power for Boat, Crab, Fishing, Net, and Salmon references.
 
 ## Figure 3: Hierarchical plot of themes -----------------------------------------------
 #NOT POSSIBLE TO RECREATE, this is a plot of what we've got
@@ -1708,48 +1520,18 @@ width0 <- full_page_portrait_width
 #                   method = "Transcript", 
 #                   interviewee = gsub("^\\d+ : Files\\\\", "", interviewee)) )
 
-table_raw0 <- dplyr::bind_rows(
-  code_references_notes0 |> 
-    rename_with(~ gsub("^[a-c]_", "", .x)) |> 
-    dplyr::rename(interviewee = x1) |> 
-    dplyr::mutate(interviewee = gsub("^\\d+ : ", "", interviewee), 
-                  interviewee = gsub(pattern = "_Deedee_ ", replacement = "", x = interviewee), 
-                  interviewee = gsub(pattern = ",", replacement = "", x = interviewee), 
-                  interviewee = gsub(pattern = " and", replacement = "", x = interviewee), 
-                  interviewee = stringr::str_to_title(interviewee) , 
-                  method = "Notes")  |> 
-    tidyr::separate(interviewee, into = c("first", "last"), #remove = FALSE, 
-                    sep = " ", extra = "drop", fill = "right") , 
-  code_references_interviews0[,1:6] |> 
-    dplyr::rename(interviewee = x1) |>
-    dplyr::rename_with(~ gsub("^[a-z]_|_\\d+$", "", .x)) |> 
-    dplyr::mutate( 
-      interviewee = gsub(pattern = "_Deedee_ ", replacement = "", x = interviewee), 
-      interviewee = gsub("^\\d+ : Files\\\\", "", interviewee), 
-      interviewee = gsub("[^[:alnum:]]", " ", interviewee), # 1. Replace special chars with space
-      interviewee = gsub("[^[:alpha:]]", " ", interviewee), 
-      interviewee = trimws(interviewee), 
-      interviewee = stringr::str_to_title(interviewee)
-    ) |> 
-    tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "val") |>
-    dplyr::mutate(cat = dplyr::case_when(
-      cat %in% c("net", "boat", "fishing") ~ "net", 
-      cat %in% c("salmon", "crab", "fish") ~ "fish", 
-      cat == "change" ~ "change"
-    ))  |> 
-    dplyr::group_by(interviewee, cat) |> 
-    dplyr::summarise(val = sum(val, na.rm = TRUE)) |> 
-    tidyr::pivot_wider(id_cols = "interviewee", names_from = cat, values_from = val) |> 
-    dplyr::mutate(method = "Transcript")  |> 
-    tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
-                    sep = " ", extra = "drop", fill = "right") ) |>
-  tidyr::pivot_longer(cols = c(change, fish, net), names_to = "Theme", values_to = "Count") |>
-  dplyr::mutate(Count = replace_na(Count, 0), 
-                Theme = stringr::str_to_title(Theme)) |> 
-  dplyr::rename(Method = method, 
-                Interviewee = last) |> 
-  dplyr::arrange((Interviewee)) |>
-  dplyr::mutate(Interviewee = factor(Interviewee, levels = rev(unique(Interviewee))))
+table_raw0 <- autocoded_theme_by_interview0 |> 
+  dplyr::rename(Interviewee = last) |>
+  dplyr::mutate(Theme = dplyr::case_when(
+    Theme %in% c("Net", "Boat", "Fishing") ~ "Net",
+    Theme %in% c("Salmon", "Crab", "Fish") ~ "Fish",
+    Theme == "Change" ~ "Change"
+  ))  |>
+  dplyr::group_by(Interviewee, Method, Theme) |>
+  dplyr::summarise(Count = sum(Count, na.rm = TRUE)) |> 
+  # dplyr::filter(Method != "NVivo_Notes") |> 
+  dplyr::mutate(Method = ifelse(Method == "NVivo_Transcript", "Transcript", Method), 
+                Method = ifelse(Method == "NVivo_Notes", "Notes", Method))
 
 expand_custom <- c(.005, .005)
 
@@ -1831,11 +1613,11 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # Do the methods at least trend together? If an interviewee talks a lot about "fish" in the transcript, do the notes reflect that increase proportionally?
 
 table_raw <- table_raw0 |> 
-  tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count)
+  tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count, values_fill = 0)
 
 # 1. Calculate the stats manually for each Theme
 stats_data <- table_raw |>
-  group_by(Theme) |>
+  dplyr::group_by(Theme) |>
   do({
     mod <- lm(Transcript ~ Notes, data = .)
     # Create the label strings
@@ -1862,7 +1644,9 @@ figure_print <- ggplot2::ggplot(
   # We use Inf/-Inf to pin the text to the corners regardless of the scale
   ggplot2::geom_text(data = stats_data, 
                      aes(x = -Inf, y = Inf, label = label), 
-                     hjust = -0.1, vjust = 1.1, size = 3.5, inherit.aes = FALSE) +
+                     hjust = -0.1, vjust = 1.1, 
+                     size = 3.5, 
+                     inherit.aes = FALSE) +
   ggplot2::facet_wrap(~Theme, scales = "free") +
   ggplot2::theme_minimal() +
   ggplot2::labs(title = "Correlation of Theme Density with Regression")
@@ -1874,11 +1658,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
 table_raw <- table_raw0 |>
-  tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count) |>
-  # tidyr::pivot_wider(names_from = Method, values_from = Count) |>
-  # Replace NAs with 0 in case an interviewee is missing in one method
-  dplyr::mutate(Notes = replace_na(Notes, 0),
-                Transcript = replace_na(Transcript, 0))
+  tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count, values_fill = 0) 
 
 # Run test for a specific theme (e.g., 'Fish')
 pp <- wilcox.test(table_raw$Transcript, table_raw$Notes, paired = TRUE)
@@ -2025,67 +1805,20 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # 
 # Verdict: You aren't just "missing" things randomly; you are consistently capturing only a small fraction of the "Net" conversation. The transcript is exponentially richer here.
 
-### Bar plot of theme ------------------
-table_raw <- themes_notesonly0[,-1]
-names(table_raw) <- substr(x = names(table_raw),start = 3, stop = nchar(names(table_raw)))
-
-table_raw0 <- table_raw <- table_raw |>
-  # dplyr::select(-x1) |> 
-  tidyr::pivot_longer(names_to = "var", values_to = "val", cols = names(table_raw)) |> 
-  dplyr::mutate(var = gsub(x = var, pattern = "_", replacement = " "), 
-                var = stringr::str_to_title(var))
-
-colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
-figure_print <- 
-  ggplot2::ggplot(
-    data = table_raw, 
-    mapping = aes(x = var, y = val, fill = var)) +
-  ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
-  ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
-                             values = colors0, 
-                             expand = expand_custom) +
-  ggplot2::scale_y_continuous(name = "Coded Themes from Research Notes", 
-                              breaks = scales::pretty_breaks(), 
-                              expand = expand_custom) +
-  ggplot2::scale_x_discrete(name = "Themes") +
-  theme_custom() 
-nickname <- paste0(nickname0)
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-
 ## Figure 4: bar chart of themes -----------------------------------------------
 
 nickname0 <- "fig-4-bar-themes-manualcode-"
-height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
+height0 <- 6 
 width0 <- full_page_portrait_width
 
-table_raw <- co_occurrence_interviews0
-names(table_raw)[2:ncol(table_raw)] <- unlist(lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2))
-
-# make unique entries - crab x boat is the same as boat x crab
-comb <- combn(names(table_raw)[2:ncol(table_raw)], 2, simplify = FALSE)
-comb <- data.frame(matrix(data = unlist(comb), ncol = 2, byrow = TRUE))
-names(comb) <- c("var", "var1")
-
-table_raw0 <- table_raw <- table_raw |> 
-  dplyr::mutate(
-    x1 = gsub(pattern = "[0-9]+ : ", replacement = "", x = x1), 
-    dplyr::across(everything(), ~na_if(., "NULL"))
-  ) |> 
-  tidyr::pivot_longer(cols = boat:salmon, names_to = "var", values_to = "val") |> 
-  dplyr::distinct() |> 
-  dplyr::rename(var1 = x1) |> 
-  dplyr::filter(!is.na(val)) |>
-  dplyr::mutate(val = as.numeric(val)) |>
-  dplyr::right_join(comb) |> 
-  dplyr::mutate(var = stringr::str_to_title(var), 
-                var1 = stringr::str_to_title(var1))
+table_raw <- cooccurance0
 
 ### Grouped bar plot by co-theme ------------------
-colors0 <- viridis::mako(length(unique(table_raw$var)), direction = -1, begin = 0.2, end = .8)
+colors0 <- viridis::mako(length(unique(table_raw$Count)), direction = -1, begin = 0.2, end = .8)
 figure_print <- 
   ggplot2::ggplot(
     data = table_raw, 
-    mapping = aes(x = var, y = val, fill = var1)) +
+    mapping = aes(x = Theme1, y = Count, fill = Theme2)) +
   geom_col(position = position_dodge2(width = 0.9, preserve = "single")) + 
   # ggplot2::geom_bar(position="dodge", stat="identity", width = 0.5) +
   ggplot2::scale_fill_manual(name = "Co-occured Theme", # "Temperature",
@@ -2101,7 +1834,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 ### Tile plot by co-theme ------------------
 colors0 <- c("grey80", 
-             viridis::cividis(n = length(1:max(table_raw$val)), 
+             viridis::cividis(n = length(1:max(table_raw$Count)), 
                               begin = 0.2, end = .8, direction = -1))
 # breaks = min(table_raw):max(table_raw), 
 
@@ -2109,13 +1842,13 @@ figure_print <-
   ggplot2::ggplot(
     data = table_raw, 
     # data = table_raw |> dplyr::mutate(val = ifelse(val == 0, NA, val)), 
-    mapping = aes(x = var, y = var1, fill = val)) +
+    mapping = aes(x = Theme2, y = Theme1, fill = Count)) +
   ggplot2::geom_tile() +
-  ggplot2::geom_text(aes(label = val)) + 
+  ggplot2::geom_text(aes(label = Count)) + 
   ggplot2::scale_fill_continuous(
     name = "Co-occurrences Count",
     palette = colors0, 
-    breaks = 0:max(table_raw$val)
+    breaks = 0:max(table_raw$Count)
   ) +
   # ggplot2::scale_fill_viridis_b(
   #   name = "Co-occurrences Count", 
@@ -2169,13 +1902,13 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 # edges with val
 edges <- table_raw |>
-  dplyr::select(var1, var, val)
+  dplyr::select(Theme1, Theme2, Count)
 
 # nodes with size = total val (node strength)
 nodes <- table_raw |>
-  tidyr::pivot_longer(cols = c(var1, var), values_to = "node") |>
-  dplyr::group_by(node) |>
-  dplyr::summarise(size = sum(val), .groups = "drop")
+  tidyr::pivot_longer(cols = c(Theme2, Theme1), values_to = "Node") |>
+  dplyr::group_by(Node) |>
+  dplyr::summarise(size = sum(Count), .groups = "drop")
 
 # build igraph
 g <- igraph::graph_from_data_frame(
@@ -2188,7 +1921,7 @@ g <- igraph::graph_from_data_frame(
 figure_print <- 
   ggraph(g, layout = "fr") +   # force-directed layout
   ggraph::geom_edge_fan(
-    aes(width = val),
+    aes(width = Count),
     color = "grey60",
     alpha = 0.8
   ) +
@@ -2230,87 +1963,14 @@ figure_print <-
 nickname <- paste0(nickname0, "network")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
-## Figure 4b: bar chart of themes -----------------------------------------------
-
-nickname0 <- "fig-4b-themes-manualcode-"
-height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-width0 <- full_page_portrait_width
-
-table_raw <- row_percent_interviews0 
-names(table_raw)[2:ncol(table_raw)] <- lapply(X = strsplit(x = names(table_raw)[2:ncol(table_raw)], split = "_"), '[[', 2)
-
-table_raw0 <- table_raw <- table_raw |> 
-  dplyr::mutate(
-    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2)))  ) |> 
-  dplyr::select(-x1) |> 
-  dplyr::left_join(oralhistory_orig |> 
-                     dplyr::filter(location_category == "LOI") |>
-                     dplyr::mutate(id = as.numeric(paste0(id))) |> 
-                     dplyr::select(id, name = source, 
-                                   indigenous, indigenous00, 
-                                   fishing_experience, collection, demographic, 
-                                   region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score, change_score)) |>
-  tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_title(cat), , 
-                id = factor(id, ordered = TRUE), 
-                freq = as.numeric(gsub(pattern = "%", replacement = "", x = freq)))
-
-
-### pca/lm/Stacked by [var] -----------------------------------------
-
-# Does frequency differ by region and by category?
-
-temp <- plot_lm_pca_stacked(
-  table_raw0 = table_raw0, 
-  var00 = c("region100_desc","fishing_experience", "collection", "indigenous00"),
-  x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
-  nickname0 = nickname0) 
-
-a <- temp$table_lm_comb
-anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
-# > unique(table_raw0$cat)
-# [1] "Boat"    "Crab"    "Fishing" "Net"     "Salmon" 
-
-# refitting model(s) with ML (instead of REML)
-# Data: table_lm
-# Models:
-#   a$`Indigenous Status`: freq ~ var00 + cat + (1 | id)
-# a$`Fishing Experience`: freq ~ var00 + cat + (1 | id)
-# a$Region: freq ~ var00 + cat + (1 | id)
-# a$`Oral History Collection`: freq ~ var00 + cat + (1 | id)
-# npar    AIC    BIC  logLik -2*log(L) Chisq Df Pr(>Chisq)
-# a$`Indigenous Status`          8 1073.5 1095.8 -528.77    1057.5                    
-# a$`Fishing Experience`         9 1075.5 1100.6 -528.77    1057.5     0  1     1.0000
-# a$Region                      10 1077.5 1105.4 -528.77    1057.5     0  1     0.9998
-# a$`Oral History Collection`   10 1077.5 1105.4 -528.77    1057.5     0  0   
-
-# We compared linear mixed-effects models predicting the frequency of mentions of Boat, Crab, Fishing, Net, and Salmon, including a random intercept for individual and fixed effects for category and respondent-level characteristics (Indigenous status, fishing experience, region, or oral history collection). Model comparisons using maximum likelihood indicated that all four models fit the data equivalently, with identical log-likelihoods and non-significant likelihood-ratio tests (p ≈ 1), and minor differences in AIC/BIC driven only by the number of parameters. These results indicate that, after accounting for category and individual-level variation, variation in term frequency is not meaningfully explained by respondent experience, region, or collection type, and is only slightly structured by Indigenous status. Consequently, individual differences and the category of fishing-related term largely drive patterns of mention frequency.
-
-# Across models predicting the frequency of Boat, Crab, Fishing, Net, and Salmon mentions (with a random intercept for individual), the Indigenous Status model shows the best fit (lowest AIC), indicating it explains slightly more variation than the alternatives. Adding Fishing Experience, Region, or Oral History Collection does not significantly improve model fit (all likelihood‐ratio tests non-significant), suggesting these factors do not add explanatory power beyond Indigenous status for patterns of fishing-related references. Overall, variation in how often these fishing terms are mentioned appears to be structured more by Indigenous status than by regional context, experience category, or collection source.
-
-# The model including Indigenous status provides the best overall fit to the data (lowest AIC), suggesting it explains slightly more variation in how frequently different fishing-related categories are mentioned than the other grouping variables. Adding fishing experience, region, or oral history collection does not significantly improve model fit relative to the Indigenous-status model (likelihood ratio tests all non-significant, p ≥ 0.31). This indicates that, after accounting for the type of fishing-related category and repeated observations within individuals, differences in mention frequency are more strongly structured by Indigenous status than by region, fishing experience, or collection source, and that these latter factors do not contribute substantial additional explanatory power for Boat, Crab, Fishing, Net, and Salmon references.
-
-
 ## Figure 5: bar chart of themes -----------------------------------------------
 
 nickname0 <- "fig-5-sentiment-heatmap-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-sentiment_raw <- sentiment_raw0
-names(sentiment_raw)[2:ncol(sentiment_raw)] <- substr(x = names(sentiment_raw)[2:ncol(sentiment_raw)],start = 3, stop = nchar(names(sentiment_raw)[2:ncol(sentiment_raw)]))
-sentiment_raw <- sentiment_raw  |> 
-  dplyr::mutate(interviewee = x1, 
-                interviewee = gsub("[1-9]+ : Files\\\\\\\\", "", interviewee), 
-                interviewee = gsub("1[0-9]+ : Files\\\\\\\\", "", interviewee), 
-                interviewee = gsub("2[0-9]+ : Files\\\\\\\\", "", interviewee), 
-                interviewee = gsub("_", " ", interviewee), 
-                interviewee = stringr::str_to_title(interviewee))  |> 
-  tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
-                  sep = " ", extra = "drop", fill = "right") |> 
+table_raw <- table_raw0 <- demographics0 |> 
   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
-  dplyr::select(-x1) |> 
   dplyr::mutate(
     cat = gsub(pattern = "_", replacement = " ", x = cat), 
     cat = stringr::str_to_sentence(cat), 
@@ -2319,84 +1979,136 @@ sentiment_raw <- sentiment_raw  |>
                  labels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
                  ordered = TRUE))
 
-# |> 
-  # table_raw0 |> 
-  # dplyr::filter(!is.na(change_score_language)), 
+figure_print <- ggplot2::ggplot(data = table_raw, 
+       mapping = aes(
+  x = change_language, 
+  y = emotional_level, 
+  color = fishing_experience, 
+  shape = indigenous_status)) +
+  geom_jitter(size = 2, width = 0.1, height = 0.1) 
 
-table_raw <- table_raw0 <- oralhistory_ref |>
-  dplyr::left_join(sentiment_raw) 
+nickname <- paste0(nickname0, "jitter")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Tile map -------------------------------------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = NULL)
 
-### Tile facet by indigenous00 -------------------------------------------------
-plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "indigenous00")
+#### Tile facet by indigenous_status -------------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "indigenous_status")
 
-### Tile facet by oral history collection --------------------------------------
+#### Tile facet by oral history collection --------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "collection")
 
-### Tile facet fishing experience  ---------------------------------------------
+#### Tile facet fishing experience  ---------------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "fishing_experience")
 
-### Tile facet fishing experience  ---------------------------------------------
-plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "emotional_score")
-plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score_language")
-plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score")
+#### Tile facet language  ---------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "emotional_level")
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "env_change_openness")
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_language")
 
-#### Boxplot ---------------------------------------------------------
-figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
-                      mapping = aes(x = cat, y = freq)) +
-  geom_boxplot() + # fill = "orange", alpha = 0.7) +
-  # labs(title = "Fuel Efficiency by Cylinder Count",
-  #      x = "Number of Cylinders",
-  #      y = "Miles Per Gallon") +
-  theme_minimal() +
-  facet_wrap(change_score_language, ncol = 1) 
+#### Boxplot demographic with change ---------------------------------------------------------
 
-
-boxplot_change <- function(x_change = "change_score_language", 
-                           y_facet = "indigenous00", 
-                           table_raw0){
-
+boxplot_change <- function(x_change = "env_change_openness", 
+                           y_facet = "indigenous_status", 
+                           table_raw){
+  
   table_raw <- table_raw0 |> 
-  dplyr::rename(x_change = {{x_change}}, 
-                y_facet = {{y_facet}}) 
-    
-figure_print <- ggplot2::ggplot(
-  data = table_raw,  
-                                mapping = aes(x = cat, y = freq, color = x_change)) +
-  geom_boxplot() + # fill = "orange", alpha = 0.7) +
-  labs(title = "Sentiment Analysis",
-       x = "Category",
-       y = "Frequency") +
-  theme_bw() +
-  ggplot2::theme(legend.position = "none") +
-  facet_grid(x_change~y_facet) 
-
-nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-return(figure_print)
+    dplyr::rename(x_change = {{x_change}}, 
+                  y_facet = {{y_facet}}) 
+  
+  figure_print <- ggplot2::ggplot(
+    data = table_raw,  
+    mapping = aes(x = cat, y = freq, fill = x_change)) +
+    geom_boxplot() + # fill = "orange", alpha = 0.7) +
+    labs(#title = "Sentiment Analysis",
+         x = "Sentiment",
+         y = "Frequency") +
+    theme_custom() +
+    theme_bw() +
+    ggplot2::theme(legend.position = "none") +
+    # ggplot2::scale_color_viridis_b(begin = .2, end = .8, direction = -1, option = "D") +
+    ggplot2::facet_grid(x_change~y_facet) 
+  
+  nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
+  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+  return(figure_print)
 }
 
-### Boxplot indigenous ---------------------------------------------------------
-boxplot_change(x_change = "change_score_language", 
-                           y_facet = "indigenous00", 
-                           table_raw0)
+boxplot_change(x_change = "env_change_openness", 
+               y_facet = "indigenous_status", 
+               table_raw)
 
-### Boxplot indigenous ---------------------------------------------------------
+boxplot_change(x_change = "emotional_level", 
+               y_facet = "indigenous_status", 
+               table_raw)
 
-figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
-                                mapping = aes(x = cat, y = freq, color = change_score_language)) +
-  geom_boxplot() + # fill = "orange", alpha = 0.7) +
-  labs(title = "Sentiment Analysis",
-       x = "Category",
-       y = "Frequency") +
-  theme_bw() +
-  ggplot2::theme(legend.position = "none") +
-  facet_grid(change_score_language~fishing_experience) 
+boxplot_change(x_change = "change_language", 
+               y_facet = "indigenous_status", 
+               table_raw)
 
-nickname <- paste0(nickname0, "boxplot_fishing_experience")
-save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+boxplot_change(x_change = "env_change_openness", 
+               y_facet = "fishing_experience", 
+               table_raw)
+
+boxplot_change(x_change = "emotional_level", 
+               y_facet = "fishing_experience", 
+               table_raw)
+
+boxplot_change(x_change = "change_language", 
+               y_facet = "fishing_experience", 
+               table_raw)
+
+#### Boxplot demographic with change types grouped ---------------------------------------------------------
+
+
+table_raw <- table_raw0 |> 
+  dplyr::select(id, last, env_change_openness, change_language, emotional_level, 
+                fishing_experience, indigenous_status, cat, freq) |> 
+  tidyr::pivot_longer(cols = c("env_change_openness", "change_language", "emotional_level"), 
+                      names_to = "change", values_to = "change_score") |> 
+  dplyr::mutate(change = dplyr::case_when(
+    change  == "env_change_openness" ~ "Openness to Environmental Change", 
+    change  == "change_language" ~ "Change Language Score", 
+    change  == "emotional_level" ~ "Emotional Level"
+  ))
+
+boxplot_change <- function(x_change = "change_score", 
+                           y_facet = "indigenous_status", 
+                           table_raw){
+  
+  table_raw <- table_raw |> 
+    dplyr::rename(x_change = {{x_change}}, 
+                  y_facet = {{y_facet}}) 
+  colors0 <- viridis::cividis(length(unique(table_raw$change)), direction = -1, begin = 0.2, end = .8)
+  
+  figure_print <- ggplot2::ggplot(
+    data = table_raw,  
+    mapping = aes(x = cat, y = freq, fill = change)) +
+    geom_boxplot() + # fill = "orange", alpha = 0.7) +
+    labs(#title = "Sentiment Analysis",
+      x = "Sentiment",
+      y = "Frequency") +
+    theme_custom() +
+    theme_bw() +
+    ggplot2::theme(legend.position = "bottom", 
+                   legend.title = element_blank(), 
+                   legend.direction = "horizontal") +
+    ggplot2::scale_fill_discrete(palette = colors0) +
+    ggplot2::facet_grid(x_change~y_facet) 
+  
+  nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
+  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+  return(figure_print)
+}
+
+boxplot_change(x_change = "change_score", 
+               y_facet = "indigenous_status", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "change_score", 
+               y_facet = "fishing_experience", 
+               table_raw = table_raw)
 
 ### pca/lm/Stacked by [var] -----------------------------------------
 
@@ -2404,67 +2116,25 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 
 temp <- plot_lm_pca_stacked(
   table_raw0 = table_raw0, 
-  var00 = c("region100_desc","fishing_experience", "collection", "indigenous00"),
+  var00 = c("region100_desc","fishing_experience", "collection", "indigenous_status"),
   x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
   nickname0 = nickname0) 
 
-# None of these alternative ways of representing respondent characteristics (region, fishing experience, collection, Indigenous identity) meaningfully improve model fit beyond category and individual-level random effects.
-# Likelihood-ratio tests indicated no improvement in model fit when alternative respondent-level predictors were included (all p > 0.4), supporting a parsimonious model including category and a random intercept for respondent.
-
-a <- temp$table_lm_comb
-anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
-
+# a <- temp$table_lm_comb
+# anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
 
 ### pca/lm/Stacked by [var] -----------------------------------------
 
 # Does frequency differ by region and by category?
 
 temp <- plot_lm_pca_stacked(
-  table_raw0 = table_raw0 |> 
-    dplyr::mutate(change_score = as.character(change_score), 
-                  change_score_language = as.character(change_score_language), 
-                  emotional_score = as.character(emotional_score)), 
-  var00 = c("change_score","change_score_language", "emotional_score"),#, "indigenous00"),
+  table_raw0 = table_raw0, 
+  var00 = c("change_language","env_change_openness", "emotional_level"),#, "indigenous_status"),
   x_name = c("Change Score", "Change Language Score", "Emotional Score"),#, "Indigenous Status"),
   nickname0 = nickname0) 
 
-# None of these alternative ways of representing respondent characteristics (region, fishing experience, collection, Indigenous identity) meaningfully improve model fit beyond category and individual-level random effects.
-# Likelihood-ratio tests indicated no improvement in model fit when alternative respondent-level predictors were included (all p > 0.4), supporting a parsimonious model including category and a random intercept for respondent.
-
-a <- temp$table_lm_comb
-anova(a$`Change Score`, a$`Change Language Score`, a$`Emotional Score`)
-
-# ## Figure 6: Hierarchical plot of auto themes -----------------------------------------------
-# #NOT DONE
-# 
-# nickname0 <- "fig-6-hierarchical-themes-autocode-"
-# height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-# width0 <- full_page_portrait_width
-# 
-# table_raw <- sentiment_raw0 
-# names(table_raw)[2:ncol(table_raw)] <- substr(x = names(table_raw)[2:ncol(table_raw)],start = 3, stop = nchar(names(table_raw)[2:ncol(table_raw)]))
-# 
-# table_raw0 <- table_raw <- table_raw |> 
-#   dplyr::mutate(
-#     id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) # , 
-#     # name = substr(x = x1, start = 12, stop = nchar(x1)), 
-#     # name = gsub(pattern = "\\\\", replacement = "", x = name), 
-#     # name = gsub(pattern = "_", replacement = " ", x = name), 
-#     # name = gsub(pattern = "-", replacement = " ", x = name), 
-#     # name = gsub(pattern = "[0-9]+", replacement = "", x = name), 
-#     # name = stringr::str_to_title(name)
-#   ) |> 
-#   dplyr::left_join(oralhistory_ref |>
-#                      dplyr::select(id, name = source, indigenous, fishing_experience, collection, demographic, indigenous00)) |>
-#   dplyr::select(-x1) |>
-#   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
-#   dplyr::mutate(cat = stringr::str_to_sentence(cat))
-# 
-# colors0 <- viridis::mako(length(unique(table_raw$cat)), direction = -1, begin = 0.2, end = .8)
-# 
-### Grouped bar plot by narrator name with grouping rectangle ------------------
-# figure_print <- ""
-
+# a <- temp$table_lm_comb
+# anova(a$`Change Score`, a$`Change Language Score`, a$`Emotional Score`)
 
 # Figure 7: Map of Oral Histories -----------------------------------------------
 
@@ -2472,7 +2142,7 @@ nickname0 <- "fig-7-map-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-table_raw0 <- table_raw <- oralhistory_orig 
+table_raw0 <- table_raw <- locations0 
 
 ### Map of all points ------------------
 
@@ -2742,48 +2412,3 @@ ggplot2::ggsave( # save your plot
   height = height0, 
   units = "in") #recall, A4 pages are 8.5 x 11 in - 1 in margins
 
-
-# Figure 8: bar chart of themes -----------------------------------------------
-
-nickname0 <- "fig-8-scores-"
-height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
-width0 <- full_page_portrait_width
-
-table_raw <- table_raw0 <- 
-  oralhistory_orig |>
-  dplyr::mutate(id = as.numeric(paste0(id))) |> 
-  dplyr::filter(location_category == "LOI") |> 
-  dplyr::select(id, name = source, indigenous, indigenous00, 
-                fishing_experience, collection, demographic, 
-                region30, region30_desc, region100, region100_desc, 
-                change_score_language, emotional_score, change_score)  |>
-  tidyr::pivot_longer(cols = change_score_language:change_score, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_title(cat), 
-                cat = gsub(pattern = "_", replacement = " ", x = cat)) 
-
-
-### pca/lm/Stacked by [var] for change_score_language -----------------------------------------
-
-temp <- plot_lm_pca_stacked(
-  table_raw0 = table_raw0, 
-  var00 = c("region100_desc","fishing_experience", "collection", "indigenous00"),
-  x_name = c("Region", "Fishing Experience", "Oral History Collection", "Indigenous Status"),
-  nickname0 = nickname0) 
-
-a <- temp$table_lm_comb
-anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
-
-# refitting model(s) with ML (instead of REML)
-# Data: table_lm
-# Models:
-#   a$`Indigenous Status`: freq ~ var00 + cat + (1 | id)
-# a$Region: freq ~ var00 + cat + (1 | id)
-# a$`Fishing Experience`: freq ~ var00 + cat + (1 | id)
-# a$`Oral History Collection`: freq ~ var00 + cat + (1 | id)
-# npar    AIC    BIC  logLik -2*log(L)  Chisq Df Pr(>Chisq)
-# a$`Indigenous Status`          6 180.90 190.88 -84.450    168.90                     
-# a$Region                       7 183.88 195.53 -84.940    169.88 0.0000  1          1
-# a$`Fishing Experience`         7 187.54 199.18 -86.768    173.54 0.0000  0           
-# a$`Oral History Collection`    7 183.88 195.53 -84.940    169.88 3.6568  0 
-
-# Model comparisons indicate that variation in frequency is best explained by change-related and emotional scoring variables, while respondent characteristics such as Indigenous status, region, fishing experience, and oral history collection do not meaningfully improve model fit. This suggests that frequency is structured by how individuals perceive and articulate change, rather than by demographic or positional attributes.
