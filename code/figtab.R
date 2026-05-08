@@ -164,24 +164,15 @@ place_labels <- data.frame(
 #   dplyr::distinct() 
 # write_csv(x = oralhistory_ref, file = "data/oralhistory_ref.csv", col_names = TRUE)
 
-oralhistory_ref <- oralhistory_ref_edited0  |> 
-  dplyr::select(-word_count, -weighted_percent, -source, 
-                -date, -link, -percent_category) |> 
-  dplyr::rename(change_score_old = change_score, 
-                change_score_language_old = change_score_language, 
-                emotional_score_old = emotional_score) |> 
-  dplyr::mutate(id = factor(id, ordered = TRUE), 
-                source_fl = gsub(pattern = ",", replacement = "", x = source_fl),
-                  indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous")) |> 
-  tidyr::separate(source_fl, into = c("first", "last"), #remove = FALSE, 
-                  sep = " ", extra = "drop", fill = "right") |> 
-  dplyr::full_join(ohp_table2_manualcoding0 |>
-                     dplyr::mutate(oral_history = gsub(pattern = ",", replacement = "", x = oral_history)) |> 
-                     tidyr::separate(oral_history, into = c("first", "last"), #remove = FALSE, 
-                                                             sep = " ", extra = "drop", fill = "right") ) |> 
-  dplyr::rename(change_score_language = env_change_openness_1_3, change_score = change_language_1_3, emotional_score = emotional_level_1_3)
-
-oralhistory_orig <- oral_histories_original0 |> 
+oralhistory_orig <- oral_histories_original0  |> 
+  dplyr::mutate(interviewee = source, 
+                # interviewee = gsub("[1-9]+ : Files\\\\\\\\", "", interviewee), 
+                # interviewee = gsub("1[0-9]+ : Files\\\\\\\\", "", interviewee), 
+                # interviewee = gsub("2[0-9]+ : Files\\\\\\\\", "", interviewee), 
+                interviewee = gsub(",", " ", interviewee), 
+                interviewee = stringr::str_to_title(interviewee))  |> 
+  tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
+                  sep = " ", extra = "drop", fill = "right")  |> 
   sf::st_as_sf(coords = c("longitude", "latitude"), 
                remove = FALSE,
                crs = crs_in) |>
@@ -193,9 +184,61 @@ oralhistory_orig <- oral_histories_original0 |>
                   location_category == "LOI" ~ "Location of Interview", 
                   location_category == "Additional" ~ "Mentioned in Interview", 
                   location_category == "Oregon" ~ "Location of Interview", 
-                )) 
+                ) )
+
 oralhistory_orig <- oralhistory_orig |> 
   dplyr::bind_cols(st_coordinates(oralhistory_orig))
+
+oralhistory_ref <- oralhistory_ref_edited0  |> 
+  dplyr::select(-word_count, -weighted_percent, -source, 
+                -date, -link, -percent_category) |> 
+  dplyr::rename(change_score_old = change_score, 
+                change_score_language_old = change_score_language, 
+                emotional_score_old = emotional_score) |> 
+  dplyr::mutate(id = factor(id, ordered = TRUE), 
+                source_fl = gsub(pattern = ",", replacement = "", x = source_fl),
+                indigenous00 = ifelse(indigenous == "Non-indigenous", "Non-indigenous", "Indigenous")) |> 
+  tidyr::separate(source_fl, into = c("first", "last"), #remove = FALSE, 
+                  sep = " ", extra = "drop", fill = "right") |> 
+  dplyr::full_join(ohp_table2_manualcoding0 |>
+                     dplyr::mutate(
+                       gsub(pattern = ", Carla, and Judy Jo", replacement = "", x = oral_history),
+                       gsub(pattern = " Ann", replacement = "", x = oral_history),
+                       oral_history = gsub(pattern = ",", replacement = "", x = oral_history)) |> 
+                     tidyr::separate(oral_history, into = c("first", "last"), #remove = FALSE, 
+                                     sep = " ", extra = "drop", fill = "right") ) |> 
+  dplyr::rename(change_score_language = env_change_openness_1_3, 
+                change_score = change_language_1_3, 
+                emotional_score = emotional_level_1_3) |> 
+  dplyr::mutate(change_score_language = dplyr::case_when(
+                  change_score_language == 1 ~ "Low",
+                  change_score_language == 2 ~ "Medium",
+                  change_score_language == 3 ~ "High"
+                ), 
+                emotional_score = dplyr::case_when(
+                  emotional_score == 1 ~ "Low",
+                  emotional_score == 2 ~ "Medium",
+                  emotional_score == 3 ~ "High"
+                ), 
+                change_score = dplyr::case_when(
+                  change_score == 1 ~ "Low",
+                  change_score == 2 ~ "Medium",
+                  change_score == 3 ~ "High"
+                ), 
+                change_score_language = factor(x = change_score_language, 
+                                               levels = c("Low", "Medium", "High" ), 
+                                               labels = c("Low", "Medium", "High" ), 
+                                               ordered = TRUE), 
+                emotional_score = factor(x = emotional_score, 
+                                         levels = c("Low", "Medium", "High" ), 
+                                         labels = c("Low", "Medium", "High" ), 
+                                         ordered = TRUE), 
+                change_score = factor(x = change_score, 
+                                      levels = c("Low", "Medium", "High" ), 
+                                      labels = c("Low", "Medium", "High" ), 
+                                      ordered = TRUE) ) |> 
+  dplyr::left_join(oralhistory_orig |> 
+                     dplyr::filter(location_category == "LOI"))
 
 # https://stackoverflow.com/questions/77179007/group-spatial-points-by-distance-in-r-how-to-group-cluster-spatial-points-so-gr
 dist0 <- 100000 # example : 11000
@@ -1157,8 +1200,8 @@ table_raw <- table_raw0
 figure_print <- ggplot2::ggplot(
   data = table_raw, 
   mapping = aes(x = reorder(Theme, number_of_coding_references, FUN = median), 
-                                       y = number_of_coding_references, 
-                                       fill = method)) +
+                y = number_of_coding_references, 
+                fill = method)) +
   # 'position_dodge' puts the boxplots side-by-side for each Theme
   ggplot2::geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.7, outlier.size = 1) +
   
@@ -1199,15 +1242,15 @@ nickname0 <- paste0(nickname0, "summarizedthemes-")
 
 table_raw0 <- table_raw0 |> 
   dplyr::rename(Method = method, Count = number_of_coding_references) |> 
-    dplyr::mutate(Theme = dplyr::case_when(
-      Theme %in% c("net", "boat", "fishing") ~ "net", 
-      Theme %in% c("salmon", "crab", "fish") ~ "fish", 
-      Theme == "change" ~ "change"
-    ))  # |> 
-  # dplyr::group_by(Theme, Method) |> 
-  # dplyr::summarise(Count = sum(number_of_coding_references, na.rm = TRUE), 
-  #                  ) #|> 
-    # tidyr::pivot_wider(id_cols = "Theme", names_from = Method, values_from = Count) 
+  dplyr::mutate(Theme = dplyr::case_when(
+    Theme %in% c("net", "boat", "fishing") ~ "net", 
+    Theme %in% c("salmon", "crab", "fish") ~ "fish", 
+    Theme == "change" ~ "change"
+  ))  # |> 
+# dplyr::group_by(Theme, Method) |> 
+# dplyr::summarise(Count = sum(number_of_coding_references, na.rm = TRUE), 
+#                  ) #|> 
+# tidyr::pivot_wider(id_cols = "Theme", names_from = Method, values_from = Count) 
 
 expand_custom <- c(.005, .005)
 
@@ -1675,8 +1718,8 @@ table_raw0 <- dplyr::bind_rows(
                   interviewee = gsub(pattern = " and", replacement = "", x = interviewee), 
                   interviewee = stringr::str_to_title(interviewee) , 
                   method = "Notes")  |> 
-  tidyr::separate(interviewee, into = c("first", "last"), #remove = FALSE, 
-                  sep = " ", extra = "drop", fill = "right") , 
+    tidyr::separate(interviewee, into = c("first", "last"), #remove = FALSE, 
+                    sep = " ", extra = "drop", fill = "right") , 
   code_references_interviews0[,1:6] |> 
     dplyr::rename(interviewee = x1) |>
     dplyr::rename_with(~ gsub("^[a-z]_|_\\d+$", "", .x)) |> 
@@ -1685,9 +1728,9 @@ table_raw0 <- dplyr::bind_rows(
       interviewee = gsub("^\\d+ : Files\\\\", "", interviewee), 
       interviewee = gsub("[^[:alnum:]]", " ", interviewee), # 1. Replace special chars with space
       interviewee = gsub("[^[:alpha:]]", " ", interviewee), 
-                         interviewee = trimws(interviewee), 
+      interviewee = trimws(interviewee), 
       interviewee = stringr::str_to_title(interviewee)
-      ) |> 
+    ) |> 
     tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "val") |>
     dplyr::mutate(cat = dplyr::case_when(
       cat %in% c("net", "boat", "fishing") ~ "net", 
@@ -1777,8 +1820,8 @@ figure_print <- ggplot2::ggplot(
     begin = .2, 
     end = .8) +
   ggplot2::scale_y_continuous(name = "Proportion of Thematic Coding", 
-                            expand = expand_custom, 
-                            labels = scales::percent) 
+                              expand = expand_custom, 
+                              labels = scales::percent) 
 
 nickname <- paste0(nickname0, "-percentage")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
@@ -1818,8 +1861,8 @@ figure_print <- ggplot2::ggplot(
   # Add the text using the stats_data table
   # We use Inf/-Inf to pin the text to the corners regardless of the scale
   ggplot2::geom_text(data = stats_data, 
-            aes(x = -Inf, y = Inf, label = label), 
-            hjust = -0.1, vjust = 1.1, size = 3.5, inherit.aes = FALSE) +
+                     aes(x = -Inf, y = Inf, label = label), 
+                     hjust = -0.1, vjust = 1.1, size = 3.5, inherit.aes = FALSE) +
   ggplot2::facet_wrap(~Theme, scales = "free") +
   ggplot2::theme_minimal() +
   ggplot2::labs(title = "Correlation of Theme Density with Regression")
@@ -1832,10 +1875,10 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # Because coding counts are often non-normal (skewed by a few very talkative people), a parametric t-test is usually inappropriate. The Wilcoxon Signed-Rank Test evaluates whether the "Transcript" method consistently yields higher counts than the "Notes" method.Hypothesis: $H_0: \text{Median Difference} = 0$.Interpretation: If $p < 0.05$, the methods produce significantly different volumes of data.Rlibrary(dplyr)
 table_raw <- table_raw0 |>
   tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count) |>
-# tidyr::pivot_wider(names_from = Method, values_from = Count) |>
+  # tidyr::pivot_wider(names_from = Method, values_from = Count) |>
   # Replace NAs with 0 in case an interviewee is missing in one method
   dplyr::mutate(Notes = replace_na(Notes, 0),
-         Transcript = replace_na(Transcript, 0))
+                Transcript = replace_na(Transcript, 0))
 
 # Run test for a specific theme (e.g., 'Fish')
 pp <- wilcox.test(table_raw$Transcript, table_raw$Notes, paired = TRUE)
@@ -1906,7 +1949,7 @@ save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nick
 # 1. Prepare the data (assuming you have 'Notes' and 'Transcript' columns)
 table_raw <- table_raw0 |>
   tidyr::pivot_wider(id_cols = c(Interviewee, Theme), names_from = Method, values_from = Count) |>
-# Replace NAs with 0 in case an interviewee is missing in one method
+  # Replace NAs with 0 in case an interviewee is missing in one method
   dplyr::mutate(Notes = replace_na(Notes, 0),
                 Transcript = replace_na(Transcript, 0))
 
@@ -2255,54 +2298,33 @@ nickname0 <- "fig-5-sentiment-heatmap-"
 height0 <- 6 # ifelse(srvy == "NEBS", full_page_portrait_height, 6)
 width0 <- full_page_portrait_width
 
-table_raw <- sentiment_raw0
-names(table_raw)[2:ncol(table_raw)] <- substr(x = names(table_raw)[2:ncol(table_raw)],start = 3, stop = nchar(names(table_raw)[2:ncol(table_raw)]))
-
-table_raw <- table_raw0 <- table_raw |> 
-  dplyr::mutate(
-    id = as.numeric(trimws(substr(x = x1, start = 1, stop = 2))) ) |> 
-  dplyr::left_join(oralhistory_orig |>
-                     dplyr::mutate(id = as.numeric(paste0(id))) |> 
-                     dplyr::filter(location_category == "LOI") |> 
-                     dplyr::select(id, name = source, indigenous, indigenous00, 
-                                   fishing_experience, collection, demographic, 
-                                   region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score, change_score)) |>
-  dplyr::select(-x1) |> 
+sentiment_raw <- sentiment_raw0
+names(sentiment_raw)[2:ncol(sentiment_raw)] <- substr(x = names(sentiment_raw)[2:ncol(sentiment_raw)],start = 3, stop = nchar(names(sentiment_raw)[2:ncol(sentiment_raw)]))
+sentiment_raw <- sentiment_raw  |> 
+  dplyr::mutate(interviewee = x1, 
+                interviewee = gsub("[1-9]+ : Files\\\\\\\\", "", interviewee), 
+                interviewee = gsub("1[0-9]+ : Files\\\\\\\\", "", interviewee), 
+                interviewee = gsub("2[0-9]+ : Files\\\\\\\\", "", interviewee), 
+                interviewee = gsub("_", " ", interviewee), 
+                interviewee = stringr::str_to_title(interviewee))  |> 
+  tidyr::separate(interviewee, into = c("last", "first"), #remove = FALSE, 
+                  sep = " ", extra = "drop", fill = "right") |> 
   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
-  dplyr::mutate(cat = stringr::str_to_title(cat), 
-                cat = gsub(pattern = "_", replacement = " ", x = cat), 
-                cat = factor(x = cat, 
-                             levels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
-                             labels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
-                             ordered = TRUE), 
-                change_score_language = dplyr::case_when(
-                  change_score_language == 1 ~ "Low",
-                  change_score_language == 2 ~ "Medium",
-                  change_score_language == 3 ~ "High"
-                ), 
-                emotional_score = dplyr::case_when(
-                  emotional_score == 1 ~ "Low",
-                  emotional_score == 2 ~ "Medium",
-                  emotional_score == 3 ~ "High"
-                ), 
-                change_score = dplyr::case_when(
-                  change_score == 1 ~ "Low",
-                  change_score == 2 ~ "Medium",
-                  change_score == 3 ~ "High"
-                ), 
-                change_score_language = factor(x = change_score_language, 
-                                               levels = c("Low", "Medium", "High" ), 
-                                               labels = c("Low", "Medium", "High" ), 
-                                               ordered = TRUE), 
-                emotional_score = factor(x = emotional_score, 
-                                               levels = c("Low", "Medium", "High" ), 
-                                               labels = c("Low", "Medium", "High" ), 
-                                               ordered = TRUE), 
-                change_score = factor(x = change_score, 
-                                               levels = c("Low", "Medium", "High" ), 
-                                               labels = c("Low", "Medium", "High" ), 
-                                               ordered = TRUE))
+  dplyr::select(-x1) |> 
+  dplyr::mutate(
+    cat = gsub(pattern = "_", replacement = " ", x = cat), 
+    cat = stringr::str_to_sentence(cat), 
+    cat = factor(x = cat, 
+                 levels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
+                 labels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
+                 ordered = TRUE))
+
+# |> 
+  # table_raw0 |> 
+  # dplyr::filter(!is.na(change_score_language)), 
+
+table_raw <- table_raw0 <- oralhistory_ref |>
+  dplyr::left_join(sentiment_raw) 
 
 ### Tile map -------------------------------------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = NULL)
@@ -2321,9 +2343,9 @@ plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "emoti
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score_language")
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score")
 
-
-pp <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
-  mapping = aes(x = cat, y = freq)) +
+#### Boxplot ---------------------------------------------------------
+figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
+                      mapping = aes(x = cat, y = freq)) +
   geom_boxplot() + # fill = "orange", alpha = 0.7) +
   # labs(title = "Fuel Efficiency by Cylinder Count",
   #      x = "Number of Cylinders",
@@ -2332,18 +2354,48 @@ pp <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_lan
   facet_wrap(change_score_language, ncol = 1) 
 
 
+boxplot_change <- function(x_change = "change_score_language", 
+                           y_facet = "indigenous00", 
+                           table_raw0){
 
-figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
-                      mapping = aes(x = cat, y = freq, color = change_score_language)) +
+  table_raw <- table_raw0 |> 
+  dplyr::rename(x_change = {{x_change}}, 
+                y_facet = {{y_facet}}) 
+    
+figure_print <- ggplot2::ggplot(
+  data = table_raw,  
+                                mapping = aes(x = cat, y = freq, color = x_change)) +
   geom_boxplot() + # fill = "orange", alpha = 0.7) +
   labs(title = "Sentiment Analysis",
        x = "Category",
        y = "Frequency") +
   theme_bw() +
   ggplot2::theme(legend.position = "none") +
-  facet_grid(change_score_language~indigenous00) 
+  facet_grid(x_change~y_facet) 
 
-nickname <- paste0(nickname0, "boxplot")
+nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+return(figure_print)
+}
+
+### Boxplot indigenous ---------------------------------------------------------
+boxplot_change(x_change = "change_score_language", 
+                           y_facet = "indigenous00", 
+                           table_raw0)
+
+### Boxplot indigenous ---------------------------------------------------------
+
+figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
+                                mapping = aes(x = cat, y = freq, color = change_score_language)) +
+  geom_boxplot() + # fill = "orange", alpha = 0.7) +
+  labs(title = "Sentiment Analysis",
+       x = "Category",
+       y = "Frequency") +
+  theme_bw() +
+  ggplot2::theme(legend.position = "none") +
+  facet_grid(change_score_language~fishing_experience) 
+
+nickname <- paste0(nickname0, "boxplot_fishing_experience")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### pca/lm/Stacked by [var] -----------------------------------------
