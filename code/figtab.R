@@ -517,28 +517,28 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
     # 4. Make PCA scatter plot colored by indigenous00
     colors0 <- viridis::mako(length(unique(table_raw$var00)), direction = -1, begin = 0.2, end = .8)
     
-    figure_print <- figure_print_pca <- 
-      ggplot2::ggplot(table_raw, 
-                      aes(x = PC1, y = PC2, color = var00, fill = var00)) +
-      ggplot2::stat_ellipse(alpha = 0.1, # , color = NA
-                            geom = "polygon") +  # semi-transparent cloud
-      ggplot2::geom_point(size = 3, 
-                          alpha = 0.8) +
-      ggplot2::theme_minimal()  + 
-      # see::scale_fill_oi(name = x_name0,palette = "black_first") + 
-      # see::scale_color_oi(name = x_name0,palette = "black_first") +
-      ggplot2::scale_fill_manual(name = x_name0,
-                                 values = colors0) +
-      ggplot2::scale_color_manual(name = x_name0,
-                                  values = colors0) +
-      ggplot2::labs(
-        x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
-        y = paste0("PC2 (", round(summary(pca_res)$importance[2,2]*100, 1), "%)")#,
-        # title = "PCA of Frequencies by ID"
-      ) +
-      theme_custom() 
-    nickname <- paste0(nickname0, var000, "-pca")
-    save_figures(figure_print = figure_print, table_raw = pca_res, nickname = nickname, width = width0, height = height0)
+    # figure_print <- figure_print_pca <- 
+    #   ggplot2::ggplot(table_raw, 
+    #                   aes(x = PC1, y = PC2, color = var00, fill = var00)) +
+    #   ggplot2::stat_ellipse(alpha = 0.1, # , color = NA
+    #                         geom = "polygon") +  # semi-transparent cloud
+    #   ggplot2::geom_point(size = 3, 
+    #                       alpha = 0.8) +
+    #   ggplot2::theme_minimal()  + 
+    #   # see::scale_fill_oi(name = x_name0,palette = "black_first") + 
+    #   # see::scale_color_oi(name = x_name0,palette = "black_first") +
+    #   ggplot2::scale_fill_discrete(name = x_name0,
+    #                              values = colors0) +
+    #   ggplot2::scale_color_manual(name = x_name0,
+    #                               values = colors0) +
+    #   ggplot2::labs(
+    #     x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
+    #     y = paste0("PC2 (", round(summary(pca_res)$importance[2,2]*100, 1), "%)")#,
+    #     # title = "PCA of Frequencies by ID"
+    #   ) +
+    #   theme_custom() 
+    # nickname <- paste0(nickname0, var000, "-pca")
+    # save_figures(figure_print = figure_print, table_raw = pca_res, nickname = nickname, width = width0, height = height0)
     
     figs <- c(figs, figure_print)
     names(figs)[length(figs)] <- nickname
@@ -600,10 +600,10 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
       begin = .2, 
       end = .8, 
       direction = -1) +
-    ggplot2::scale_y_continuous(name = "Frequency of Code References", 
+    ggplot2::scale_y_continuous(name = "Frequency of Code References",
                                 expand = expand_custom) +
-    ggplot2::scale_x_discrete(name = x_name, 
-                              labels = function(x) str_wrap(x, width = 20), 
+    ggplot2::scale_x_discrete(name = x_name,
+                              labels = function(x) str_wrap(x, width = 20),
                               expand = expand_custom) +
     theme_custom() + 
     ggplot2::facet_wrap(vars(x_name), scales = "free")
@@ -648,8 +648,8 @@ plot_lm_pca_stacked <- function(table_raw0, var00, x_name, nickname0, legend_tit
     ggplot2::theme_minimal() +
     # see::scale_fill_oi(name = x_name0, palette = "black_first") + 
     # see::scale_color_oi(name = x_name0, palette = "black_first") +
-    ggplot2::scale_fill_viridis_d(name = "", option = "E", begin = .2, end = .8) +
-    ggplot2::scale_color_viridis_d(name = "", option = "E", begin = .2, end = .8) +
+    # ggplot2::scale_fill_viridis_d(name = "", option = "E", begin = .2, end = .8) +
+    # ggplot2::scale_color_viridis_d(name = "", option = "E", begin = .2, end = .8) +
     # ggplot2::scale_shape(name = "") +    
     ggplot2::labs(
       x = paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)"),
@@ -2207,7 +2207,7 @@ table_raw0 <- table_raw <- table_raw |>
                                    indigenous, indigenous00, 
                                    fishing_experience, collection, demographic, 
                                    region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score)) |>
+                                   change_score_language, emotional_score, change_score)) |>
   tidyr::pivot_longer(cols = boat:salmon, names_to = "cat", values_to = "freq") |> 
   dplyr::mutate(cat = stringr::str_to_title(cat), , 
                 id = factor(id, ordered = TRUE), 
@@ -2267,11 +2267,42 @@ table_raw <- table_raw0 <- table_raw |>
                      dplyr::select(id, name = source, indigenous, indigenous00, 
                                    fishing_experience, collection, demographic, 
                                    region30, region30_desc, region100, region100_desc, 
-                                   change_score_language, emotional_score)) |>
+                                   change_score_language, emotional_score, change_score)) |>
   dplyr::select(-x1) |> 
   tidyr::pivot_longer(cols = very_negative:very_positive, names_to = "cat", values_to = "freq") |> 
   dplyr::mutate(cat = stringr::str_to_title(cat), 
-                cat = gsub(pattern = "_", replacement = " ", x = cat)) 
+                cat = gsub(pattern = "_", replacement = " ", x = cat), 
+                cat = factor(x = cat, 
+                             levels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
+                             labels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
+                             ordered = TRUE), 
+                change_score_language = dplyr::case_when(
+                  change_score_language == 1 ~ "Low",
+                  change_score_language == 2 ~ "Medium",
+                  change_score_language == 3 ~ "High"
+                ), 
+                emotional_score = dplyr::case_when(
+                  emotional_score == 1 ~ "Low",
+                  emotional_score == 2 ~ "Medium",
+                  emotional_score == 3 ~ "High"
+                ), 
+                change_score = dplyr::case_when(
+                  change_score == 1 ~ "Low",
+                  change_score == 2 ~ "Medium",
+                  change_score == 3 ~ "High"
+                ), 
+                change_score_language = factor(x = change_score_language, 
+                                               levels = c("Low", "Medium", "High" ), 
+                                               labels = c("Low", "Medium", "High" ), 
+                                               ordered = TRUE), 
+                emotional_score = factor(x = emotional_score, 
+                                               levels = c("Low", "Medium", "High" ), 
+                                               labels = c("Low", "Medium", "High" ), 
+                                               ordered = TRUE), 
+                change_score = factor(x = change_score, 
+                                               levels = c("Low", "Medium", "High" ), 
+                                               labels = c("Low", "Medium", "High" ), 
+                                               ordered = TRUE))
 
 ### Tile map -------------------------------------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = NULL)
@@ -2284,6 +2315,36 @@ plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "colle
 
 ### Tile facet fishing experience  ---------------------------------------------
 plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "fishing_experience")
+
+### Tile facet fishing experience  ---------------------------------------------
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "emotional_score")
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score_language")
+plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "change_score")
+
+
+pp <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
+  mapping = aes(x = cat, y = freq)) +
+  geom_boxplot() + # fill = "orange", alpha = 0.7) +
+  # labs(title = "Fuel Efficiency by Cylinder Count",
+  #      x = "Number of Cylinders",
+  #      y = "Miles Per Gallon") +
+  theme_minimal() +
+  facet_wrap(change_score_language, ncol = 1) 
+
+
+
+figure_print <- ggplot2::ggplot(data = table_raw0 |> dplyr::filter(!is.na(change_score_language)),  
+                      mapping = aes(x = cat, y = freq, color = change_score_language)) +
+  geom_boxplot() + # fill = "orange", alpha = 0.7) +
+  labs(title = "Sentiment Analysis",
+       x = "Category",
+       y = "Frequency") +
+  theme_bw() +
+  ggplot2::theme(legend.position = "none") +
+  facet_grid(change_score_language~indigenous00) 
+
+nickname <- paste0(nickname0, "boxplot")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### pca/lm/Stacked by [var] -----------------------------------------
 
@@ -2300,6 +2361,26 @@ temp <- plot_lm_pca_stacked(
 
 a <- temp$table_lm_comb
 anova(a$Region, a$`Fishing Experience`, a$`Oral History Collection`, a$`Indigenous Status`)
+
+
+### pca/lm/Stacked by [var] -----------------------------------------
+
+# Does frequency differ by region and by category?
+
+temp <- plot_lm_pca_stacked(
+  table_raw0 = table_raw0 |> 
+    dplyr::mutate(change_score = as.character(change_score), 
+                  change_score_language = as.character(change_score_language), 
+                  emotional_score = as.character(emotional_score)), 
+  var00 = c("change_score","change_score_language", "emotional_score"),#, "indigenous00"),
+  x_name = c("Change Score", "Change Language Score", "Emotional Score"),#, "Indigenous Status"),
+  nickname0 = nickname0) 
+
+# None of these alternative ways of representing respondent characteristics (region, fishing experience, collection, Indigenous identity) meaningfully improve model fit beyond category and individual-level random effects.
+# Likelihood-ratio tests indicated no improvement in model fit when alternative respondent-level predictors were included (all p > 0.4), supporting a parsimonious model including category and a random intercept for respondent.
+
+a <- temp$table_lm_comb
+anova(a$`Change Score`, a$`Change Language Score`, a$`Emotional Score`)
 
 # ## Figure 6: Hierarchical plot of auto themes -----------------------------------------------
 # #NOT DONE
