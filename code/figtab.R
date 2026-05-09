@@ -1974,10 +1974,19 @@ table_raw <- table_raw0 <- demographics0 |>
   dplyr::mutate(
     cat = gsub(pattern = "_", replacement = " ", x = cat), 
     cat = stringr::str_to_sentence(cat), 
+    cat0 = cat,
     cat = factor(x = cat, 
                  levels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
                  labels = c("Very negative", "Moderately negative", "Moderately positive", "Very positive" ), 
-                 ordered = TRUE))
+                 ordered = TRUE)#,
+# cat0 = gsub(pattern = " ", replacement = "\n", x = as.character(cat0)), 
+# cat0 = factor(x = cat0,
+#                  levels = c("Very\nnegative", "Moderately\nnegative", "Moderately\npositive", "Very\npositive" ),
+#                  labels = c("Very\nnegative", "Moderately\nnegative", "Moderately\npositive", "Very\npositive" ),
+#                  ordered = TRUE)
+  )
+
+### scatter jitter -------------------------------------------------------------
 
 figure_print <- ggplot2::ggplot(data = table_raw, 
        mapping = aes(
@@ -1987,7 +1996,7 @@ figure_print <- ggplot2::ggplot(data = table_raw,
   shape = indigenous_status)) +
   geom_jitter(size = 2, width = 0.1, height = 0.1) 
 
-nickname <- paste0(nickname0, "jitter")
+nickname <- paste0(nickname0, "scatter-jitter")
 save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### Tile map -------------------------------------------------------------------
@@ -2012,6 +2021,13 @@ plot_tileheat(table_raw0 = table_raw0, nickname0 = nickname0, facet_var = "chang
 boxplot_change <- function(x_change = "env_change_openness", 
                            y_facet = "indigenous_status", 
                            table_raw){
+  title0 <- dplyr::case_when(
+    x_change  == "env_change_openness" ~ "Openness to Environmental Change", 
+    x_change  == "change_language" ~ "Change Language Score", 
+    x_change  == "emotional_level" ~ "Emotional Level"
+    )
+  
+  # colors0 <- viridis::cividis(nrow(unique(table_raw[,x_change])), direction = -1, begin = 0.2, end = .8)
   
   table_raw <- table_raw0 |> 
     dplyr::rename(x_change = {{x_change}}, 
@@ -2020,47 +2036,93 @@ boxplot_change <- function(x_change = "env_change_openness",
   figure_print <- ggplot2::ggplot(
     data = table_raw,  
     mapping = aes(x = cat, y = freq, fill = x_change)) +
-    geom_boxplot() + # fill = "orange", alpha = 0.7) +
-    labs(#title = "Sentiment Analysis",
+    geom_boxplot(position = position_dodge2(preserve = "single")) + 
+    labs(title = title0, # "Sentiment Analysis",
          x = "Sentiment",
          y = "Frequency") +
-    theme_custom() +
     theme_bw() +
-    ggplot2::theme(legend.position = "none") +
+    theme_custom() +
+    ggplot2::theme(
+      legend.position = "none") +
     # ggplot2::scale_color_viridis_b(begin = .2, end = .8, direction = -1, option = "D") +
+    ggplot2::facet_grid(x_change~y_facet) +
+    ggplot2::scale_fill_viridis_d(
+      option = "D", 
+      direction = -1, begin = 0.2, end = .8#,
+      # labels = function(x) str_wrap(x, width = 10)
+      ) +
+    ggplot2::scale_x_discrete(#palette = colors0,
+                              labels = function(x) str_wrap(x, width = 10))
+  
+  nickname <- paste0(nickname0, "boxplot_", x_change, "_", y_facet)
+  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
+  return(figure_print)
+}
+
+table_raw <- table_raw0 
+
+boxplot_change(x_change = "env_change_openness", 
+               y_facet = "indigenous_status", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "emotional_level", 
+               y_facet = "indigenous_status", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "change_language", 
+               y_facet = "indigenous_status", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "env_change_openness", 
+               y_facet = "fishing_experience", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "emotional_level", 
+               y_facet = "fishing_experience", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "change_language", 
+               y_facet = "fishing_experience", 
+               table_raw = table_raw)
+
+#### Boxplot demographic with change types grouped ---------------------------------------------------------
+
+boxplot_change <- function(x_change = "change_score", 
+                           y_facet = "indigenous_status", 
+                           table_raw){
+  
+  table_raw <- table_raw |> 
+    dplyr::rename(x_change = {{x_change}}, 
+                  y_facet = {{y_facet}}) 
+  # colors0 <- viridis::cividis(length(unique(table_raw$change)), direction = -1, begin = 0.2, end = .8)
+  
+  figure_print <- ggplot2::ggplot(
+    data = table_raw,  
+    mapping = aes(x = cat, y = freq, fill = change)) +
+    geom_boxplot(position = position_dodge2(preserve = "single")) + # fill = "orange", alpha = 0.7) +
+    labs(#title = "Sentiment Analysis",
+      x = "Sentiment",
+      y = "Frequency") +
+    theme_custom() +
+    ggplot2::theme(legend.position = "bottom", 
+                   legend.title = element_blank(), 
+                   legend.direction = "horizontal") + 
+    ggplot2::scale_fill_viridis_d(
+      option = "D", 
+      direction = -1, begin = 0.2, end = .8#,
+      # labels = function(x) str_wrap(x, width = 10)
+      ) +
+    ggplot2::scale_x_discrete(#palette = colors0,
+      labels = function(x) str_wrap(x, width = 10))+
+    # ggplot2::scale_x_discrete(palette = colors0, 
+    #                           labels = function(x) str_wrap(x, width = 10)) +
     ggplot2::facet_grid(x_change~y_facet) 
   
   nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
   save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
   return(figure_print)
 }
-
-boxplot_change(x_change = "env_change_openness", 
-               y_facet = "indigenous_status", 
-               table_raw)
-
-boxplot_change(x_change = "emotional_level", 
-               y_facet = "indigenous_status", 
-               table_raw)
-
-boxplot_change(x_change = "change_language", 
-               y_facet = "indigenous_status", 
-               table_raw)
-
-boxplot_change(x_change = "env_change_openness", 
-               y_facet = "fishing_experience", 
-               table_raw)
-
-boxplot_change(x_change = "emotional_level", 
-               y_facet = "fishing_experience", 
-               table_raw)
-
-boxplot_change(x_change = "change_language", 
-               y_facet = "fishing_experience", 
-               table_raw)
-
-#### Boxplot demographic with change types grouped ---------------------------------------------------------
-
+width0 <- full_page_landscape_width
 
 table_raw <- table_raw0 |> 
   dplyr::select(id, last, env_change_openness, change_language, emotional_level, 
@@ -2071,36 +2133,7 @@ table_raw <- table_raw0 |>
     change  == "env_change_openness" ~ "Openness to Environmental Change", 
     change  == "change_language" ~ "Change Language Score", 
     change  == "emotional_level" ~ "Emotional Level"
-  ))
-
-boxplot_change <- function(x_change = "change_score", 
-                           y_facet = "indigenous_status", 
-                           table_raw){
-  
-  table_raw <- table_raw |> 
-    dplyr::rename(x_change = {{x_change}}, 
-                  y_facet = {{y_facet}}) 
-  colors0 <- viridis::cividis(length(unique(table_raw$change)), direction = -1, begin = 0.2, end = .8)
-  
-  figure_print <- ggplot2::ggplot(
-    data = table_raw,  
-    mapping = aes(x = cat, y = freq, fill = change)) +
-    geom_boxplot() + # fill = "orange", alpha = 0.7) +
-    labs(#title = "Sentiment Analysis",
-      x = "Sentiment",
-      y = "Frequency") +
-    theme_custom() +
-    theme_bw() +
-    ggplot2::theme(legend.position = "bottom", 
-                   legend.title = element_blank(), 
-                   legend.direction = "horizontal") +
-    ggplot2::scale_fill_discrete(palette = colors0) +
-    ggplot2::facet_grid(x_change~y_facet) 
-  
-  nickname <- paste0(nickname0, "boxplot_",x_change, "_", y_facet)
-  save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
-  return(figure_print)
-}
+  )) 
 
 boxplot_change(x_change = "change_score", 
                y_facet = "indigenous_status", 
@@ -2113,6 +2146,7 @@ boxplot_change(x_change = "change_score",
 ### pca/lm/Stacked by [var] -----------------------------------------
 
 # Does frequency differ by region and by category?
+width0 <- full_page_portrait_width
 
 temp <- plot_lm_pca_stacked(
   table_raw0 = table_raw0, 
