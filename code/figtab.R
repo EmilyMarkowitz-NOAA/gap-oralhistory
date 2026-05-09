@@ -219,7 +219,7 @@ locations0 <- locations0 |>
 demographics0 <- dplyr::left_join(
   demographics0, 
   locations0 |> 
-    dplyr::filter(location_category0 == "LOI") |>
+    dplyr::filter(location_category == "LOI") |>
     sf::st_drop_geometry() |> 
     dplyr::select(last, region100, region100_desc, region30, region30_desc, region, region_desc))
 
@@ -2122,11 +2122,13 @@ boxplot_change <- function(x_change = "change_score",
   save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
   return(figure_print)
 }
+
 width0 <- full_page_landscape_width
 
 table_raw <- table_raw0 |> 
   dplyr::select(id, last, env_change_openness, change_language, emotional_level, 
-                fishing_experience, indigenous_status, cat, freq) |> 
+                fishing_experience, indigenous_status, collection, region100_desc, 
+                cat, freq) |> 
   tidyr::pivot_longer(cols = c("env_change_openness", "change_language", "emotional_level"), 
                       names_to = "change", values_to = "change_score") |> 
   dplyr::mutate(change = dplyr::case_when(
@@ -2142,6 +2144,39 @@ boxplot_change(x_change = "change_score",
 boxplot_change(x_change = "change_score", 
                y_facet = "fishing_experience", 
                table_raw = table_raw)
+
+boxplot_change(x_change = "change_score", 
+               y_facet = "collection", 
+               table_raw = table_raw)
+
+boxplot_change(x_change = "change_score", 
+               y_facet = "region100_desc", 
+               table_raw = table_raw)
+
+figure_print <- ggplot2::ggplot(
+  data = table_raw,  
+  mapping = aes(x = cat, y = freq, fill = change)) +
+  geom_boxplot(position = position_dodge2(preserve = "single")) + # fill = "orange", alpha = 0.7) +
+  labs(#title = "Sentiment Analysis",
+    x = "Sentiment",
+    y = "Frequency") +
+  theme_custom() +
+  ggplot2::theme(legend.position = "bottom", 
+                 legend.title = element_blank(), 
+                 legend.direction = "horizontal") + 
+  ggplot2::scale_fill_viridis_d(
+    option = "D", 
+    direction = -1, begin = 0.2, end = .8#,
+    # labels = function(x) str_wrap(x, width = 10)
+  ) +
+  ggplot2::scale_x_discrete(#palette = colors0,
+    labels = function(x) str_wrap(x, width = 10))+
+  # ggplot2::scale_x_discrete(palette = colors0, 
+  #                           labels = function(x) str_wrap(x, width = 10)) +
+  ggplot2::facet_wrap(~change_score, ncol = 1) 
+
+nickname <- paste0(nickname0, "boxplot_change_score")
+save_figures(figure_print = figure_print, table_raw = table_raw, nickname = nickname, width = width0, height = height0)
 
 ### pca/lm/Stacked by [var] -----------------------------------------
 
