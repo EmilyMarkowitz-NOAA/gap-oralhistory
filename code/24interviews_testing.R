@@ -4,6 +4,12 @@ library(tidyverse)
 library(tidytext)
 library(tm)
 library(topicmodels)
+library(seededlda)
+library(quanteda)
+library(treemap)
+
+
+install.packages('quanteda')
 
 
 pdf_dir <- "~/NOAA_OralHistory/Transcripts/drive-download-20260428T072127Z-3-001"  
@@ -36,7 +42,9 @@ custom_stops <- tibble(word = c(
   "it's", "don't", "that's", "i'm", "you're", 
   "we're", "they're", "there's","kitty", "sopow", "cpw", "ekuk", "hundred",
   "days", "time", "people", "nice", "guess",  "don", "didn", "wasn", "couldn", "wouldn",
-  "isn", "aren", "haven", "hasn", "won", "carla", "pretty"                    
+  "isn", "aren", "haven", "hasn", "won", "carla", "pretty", "leilani", "luhrs", "jack", "schultheis", "nick",
+  "mas", "tucker", "annette", "caruso", "cah",
+  "sighs", "inaudible", "wanyer", "rhonda", "harmony", "betty", "bonin", "wilburn"                    
 ))
 
 tokens <- interviews %>%
@@ -116,3 +124,82 @@ ggplot(nrc_overall, aes(x = reorder(sentiment, proportion),
     x = NULL, y = "Proportion of emotional words"
   ) +
   theme_minimal()
+
+
+
+# 5. TEST SEEDING THEME 'CHANGE' -----------------------------------------------
+
+custom_stops <- tibble(word = c(
+  # filler/spoken word artifacts
+  "yeah", "uh", "um", "gonna", "gotta", "kinda", "sorta",
+  "okay", "right", "well", "huh", "lot", "pretty", "stuff",
+  "guess", "nice", "days", "time", "people", "day",
+  "sighs", "inaudible", 
+  
+  # broken contractions from apostrophe stripping
+  "don", "didn", "wasn", "couldn", "wouldn",
+  "isn", "aren", "haven", "hasn", "won", "can",
+  
+  # interviewer/interviewee names
+  "larsen", "gary", "kim", "sparks", "lavoie",
+  "kitty", "sopow", "carla", "anna", "leilani",
+  "luhrs", "jack", "schultheis", "nick", "mas",
+  "tucker", "annette", "caruso", "wanyer", "rhonda",
+  "harmony", "betty", "bonin", "wilburn", "judyjo", 
+  "matson", "harris", "connie",
+  
+  # transcript formatting artifacts
+  "interviewer", "laughter", "laughs", "cah",
+  
+  # generic verbs with low analytical value
+  "started", "stayed", "came", "got", "said",
+  "told", "went", "come", "get", "just", "shit", "called", "grew"
+))
+
+tokens_clean <- tokens %>%
+  anti_join(custom_stops, by = "word")
+
+# Build DFM from the cleaned tokens made earlier
+dfm_q <- tokens_clean %>%
+  count(name, word) %>%
+  cast_dfm(name, word, n)
+
+print(dfm_q)
+
+
+# run without any seeded themes
+set.seed(42)
+
+lda_unseeded <- textmodel_lda(dfm_q, k = 6)
+
+# Top 15 words per topic
+terms(lda_unseeded, 15)
+
+
+# do it with the change theme
+seed_dict <- dictionary(list(
+  change = c(
+    "change", "changing", "different", "used", "anymore",
+    "before", "remember", "decline", "less", "gone",
+    "warming", "ice", "weather", "season", "shift",
+    "future", "worried", "concern", "impact", "loss" 
+  ),
+  topic2 = character(0),  # free topic = no seeds present
+  topic3 = character(0),
+  topic4 = character(0),
+  topic5 = character(0),
+  topic6 = character(0)
+))
+
+set.seed(42)
+
+lda_seeded <- textmodel_seededlda(
+  dfm_q,
+  dictionary = seed_dict,
+  residual   = FALSE,   # extra 'catch-all' topic
+  verbose    = TRUE
+)
+
+terms(lda_seeded, 15)
+
+
