@@ -138,7 +138,7 @@ custom_stops <- tibble(word = c(
   
   # broken contractions from apostrophe stripping
   "don", "didn", "wasn", "couldn", "wouldn",
-  "isn", "aren", "haven", "hasn", "won", "can",
+  "isn", "aren", "haven", "hasn", "won", "can", 
   
   # interviewer/interviewee names
   "larsen", "gary", "kim", "sparks", "lavoie",
@@ -169,11 +169,9 @@ print(dfm_q)
 
 # run without any seeded themes
 set.seed(42)
-
 lda_unseeded <- textmodel_lda(dfm_q, k = 6)
-
-# Top 15 words per topic
-terms(lda_unseeded, 15)
+# Top 10 words per topic
+terms(lda_unseeded, 10)
 
 
 # do it with the change theme
@@ -182,13 +180,45 @@ seed_dict <- dictionary(list(
     "change", "changing", "different", "used", "anymore",
     "before", "remember", "decline", "less", "gone",
     "warming", "ice", "weather", "season", "shift",
-    "future", "worried", "concern", "impact", "loss" 
+    "future", "worried", "concern", "impact", "loss", "gain",
+    "improvement", "improve", "hope", "concern", "adapt", "better",
+    "worse"
   ),
-  topic2 = character(0),  # free topic = no seeds present
-  topic3 = character(0),
-  topic4 = character(0),
-  topic5 = character(0),
-  topic6 = character(0)
+  
+  community = c(
+    "community", "village", "people", "together", "share",
+    "neighbor", "local", "tribe", "tribal", "native",
+    "indigenous", "elder", "elders", "culture", "cultural",
+    "tradition", "traditional", "gather", "gathering",
+    "support", "help", "group", "cooperative", "region"
+  ),
+  family = c(
+    "family", "mom", "dad", "mother", "father",
+    "son", "daughter", "kids", "children", "grandma",
+    "grandpa", "grandfather", "grandmother", "sister",
+    "brother", "husband", "wife", "parents", "home",
+    "generation", "taught", "learned", "memories", "remember",
+    "memory"
+  ),
+  
+  # topic4 = character(0), # free — finds whatever
+  # topic5 = character(0) 
+  
+  subsistence = c(
+    "subsistence", "harvest", "eat", "food", "smoke",
+    "smoked", "cut", "dry", "dried", "pick", "gather",
+    "hunt", "hunting", "moose", "berries", "salmon",
+    "fish", "store", "feed", "winter", "supply",
+    "land", "traditional", "preserve"
+  ),
+  economic = c(
+    "money", "job", "pay", "quit", "income", "permit",
+    "price", "market", "sell", "sold", "gear", "pounds",
+    "quota", "license", "cost", "expensive", "afford",
+    "profit", "loss", "debt", "crew", "hired", "wage",
+    "business", "company", "processor", "crash"
+  )
+ 
 ))
 
 set.seed(42)
@@ -196,10 +226,10 @@ set.seed(42)
 lda_seeded <- textmodel_seededlda(
   dfm_q,
   dictionary = seed_dict,
-  residual   = FALSE,   # extra 'catch-all' topic
+  residual   = TRUE,   # extra 'catch-all' topic
   verbose    = TRUE
 )
 
-terms(lda_seeded, 15)
+terms(lda_seeded, 10)
 
 
