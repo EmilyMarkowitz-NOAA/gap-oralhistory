@@ -1,0 +1,421 @@
+---
+title: "Alaska Oral Histories Project, NLP Figures Spr 26"
+author: "Lorenzo Roel Flores McCleese"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 10,
+  fig.height = 7
+)
+
+library(pdftools)
+library(tidyverse)
+library(tidytext)
+library(tm)
+library(topicmodels)
+library(seededlda)
+library(quanteda)
+library(treemap)
+```
+
+```{r load-data, include=FALSE}
+pdf_dir <- "~/NOAA_OralHistory/Transcripts/drive-download-20260428T072127Z-3-001"
+
+interviews <- tibble(
+  file = list.files(pdf_dir, pattern = "\\.pdf$", full.names = TRUE)
+) %>%
+  mutate(
+    name = tools::file_path_sans_ext(basename(file)),
+    text = map_chr(file, ~ paste(pdf_text(.x), collapse = " "))
+  ) %>%
+  select(name, text) %>%
+  mutate(text = str_replace_all(text, "[\u2019\u2018\u0060']", " "))
+
+# Custom stopwords
+custom_stops <- tibble(word = c(
+  "yeah", "uh", "um", "gonna", "gotta",
+  "kinda", "sorta", "okay", "right", "well",
+  "huh", "lot", "started", "stayed",
+  "larsen", "gary", "kim", "sparks",
+  "lavoie", "interviewer", "laughter", "laughs",
+  "it's", "don't", "that's", "i'm", "you're",
+  "we're", "they're", "there's", "kitty", "sopow", "cpw", "ekuk", "hundred",
+  "days", "time", "people", "nice", "guess",
+  "don", "didn", "wasn", "couldn", "wouldn",
+  "isn", "aren", "haven", "hasn", "won", "carla", "pretty", "leilani", "luhrs",
+  "jack", "schultheis", "nick", "mas", "tucker", "annette", "caruso", "cah",
+  "sighs", "inaudible", "wanyer", "rhonda", "harmony", "betty", "bonin", "wilburn"
+))
+
+# Tokens (used for LDA and early NRC plot)
+tokens <- interviews %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words, by = "word") %>%
+  anti_join(custom_stops, by = "word") %>%
+  filter(
+    !str_detect(word, "^\\d+$"),
+    !str_detect(word, "'"),
+    nchar(word) > 2
+  )
+
+# Tokens clean (extra stops applied — used for seededLDA and sentiment)
+custom_stops_v2 <- tibble(word = c(
+  "yeah", "uh", "um", "gonna", "gotta", "kinda", "sorta",
+  "okay", "right", "well", "huh", "lot", "pretty", "stuff",
+  "guess", "nice", "days", "time", "people", "day",
+  "sighs", "inaudible",
+  "don", "didn", "wasn", "couldn", "wouldn",
+  "isn", "aren", "haven", "hasn", "won", "can",
+  "larsen", "gary", "kim", "sparks", "lavoie",
+  "kitty", "sopow", "carla", "anna", "leilani",
+  "luhrs", "jack", "schultheis", "nick", "mas",
+  "tucker", "annette", "caruso", "wanyer", "rhonda",
+  "harmony", "betty", "bonin", "wilburn", "judyjo",
+  "matson", "harris", "connie",
+  "interviewer", "laughter", "laughs", "cah",
+  "started", "stayed", "came", "got", "said",
+  "told", "went", "come", "get", "just", "shit", "called", "grew"
+))
+
+tokens_clean <- tokens %>%
+  anti_join(custom_stops_v2, by = "word")
+```
+
+```{r lda-setup, include=FALSE}
+# Build DTM for LDA
+word_counts <- tokens %>%
+  count(name, word, sort = TRUE)
+
+dtm <- word_counts %>%
+  cast_dtm(name, word, n)
+
+dtm <- removeSparseTerms(dtm, 0.88)
+
+set.seed(42)
+lda_model <- LDA(
+  dtm,
+  k       = 6,
+  method  = "Gibbs",
+  control = list(seed = 42, burnin = 1000, iter = 2000)
+)
+```
+
+```{r seededlda-setup, include=FALSE}
+# Build DFM for seededLDA
+dfm_q <- tokens_clean %>%
+  count(name, word) %>%
+  cast_dfm(name, word, n)
+
+# Unseeded
+set.seed(42)
+lda_unseeded <- textmodel_lda(dfm_q, k = 6)
+
+# Seeded dictionary
+seed_dict <- dictionary(list(
+  change = c(
+    "change", "changing", "different", "used", "anymore",
+    "before", "remember", "decline", "less", "gone",
+    "warming", "ice", "weather", "season", "shift",
+    "future", "worried", "concern", "impact", "loss",
+    "improve", "hope", "adapt", "better", "worse"
+  ),
+  community = c(
+    "community", "village", "people", "together", "share",
+    "neighbor", "local", "tribe", "tribal", "native",
+    "indigenous", "elder", "elders", "culture", "cultural",
+    "tradition", "traditional", "gather", "gathering",
+    "support", "help", "group", "cooperative", "region"
+  ),
+  family = c(
+    "family", "mom", "dad", "mother", "father",
+    "son", "daughter", "kids", "children", "grandma",
+    "grandpa", "grandfather", "grandmother", "sister",
+    "brother", "husband", "wife", "parents", "home",
+    "generation", "taught", "learned", "memories", "remember"
+  ),
+  subsistence = c(
+    "subsistence", "harvest", "eat", "food", "smoke",
+    "smoked", "cut", "dry", "dried", "pick", "gather",
+    "hunt", "hunting", "moose", "berries", "salmon",
+    "fish", "store", "feed", "winter", "supply",
+    "land", "traditional", "preserve"
+  ),
+  economic = c(
+    "money", "job", "pay", "quit", "income", "permit",
+    "price", "market", "sell", "sold", "gear", "pounds",
+    "quota", "license", "cost", "expensive", "afford",
+    "profit", "loss", "debt", "crew", "hired", "wage",
+    "business", "company", "processor", "crash"
+  )
+))
+
+set.seed(42)
+lda_seeded <- textmodel_seededlda(
+  dfm_q,
+  dictionary = seed_dict,
+  residual   = TRUE,
+  verbose    = FALSE
+)
+```
+
+```{r sentiment-setup, include=FALSE}
+# NRC
+nrc_scores <- tokens_clean %>%
+  inner_join(get_sentiments("nrc"),
+             by = "word", relationship = "many-to-many") %>%
+  count(name, sentiment) %>%
+  group_by(name) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup()
+
+nrc_overall <- nrc_scores %>%
+  group_by(sentiment) %>%
+  summarise(total = sum(n), .groups = "drop") %>%
+  mutate(proportion = total / sum(total))
+
+# AFINN
+afinn_scores <- tokens_clean %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(name) %>%
+  summarise(
+    afinn_mean  = mean(value),
+    afinn_total = sum(value),
+    n_words     = n(),
+    .groups = "drop"
+  )
+
+# BING
+bing_scores <- tokens_clean %>%
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(name, sentiment) %>%
+  pivot_wider(names_from  = sentiment,
+              values_from = n,
+              values_fill = 0) %>%
+  mutate(
+    bing_total        = positive + negative,
+    bing_pct_positive = positive / bing_total,
+    bing_pct_negative = negative / bing_total,
+    bing_score        = (positive - negative) / bing_total
+  )
+
+# NVivo sentiment data
+nvivo_sentiment <- tibble(
+  name = c(
+    "abston_virginia", "bennis_wassiliisa", "caruso_annette",
+    "hall_daniel", "hester_carolann_schlais_meganna_hester_elizabeth",
+    "hockema_rex", "hurley_alannah", "ilutsik_esther",
+    "ingram_june", "layland_lindsay", "luhrs_leilani",
+    "matson_judyjo_harris_carla", "moore_apayu", "nelson_joanne",
+    "painter_ted", "redfox_bernadette", "robison_jan",
+    "schultheis_jack", "shankle_anne", "smith_simuka",
+    "timmerman_connie", "tucker_nick",
+    "wayner_harmony_wayner_rhonda_bonin_betty", "wilson_mike"
+  ),
+  very_negative = c(12,10,4,1,17,26,13,5,5,21,20,27,26,12,16,4,33,10,13,28,7,13,4,45),
+  mod_negative  = c(17,23,7,3,24,36,13,10,10,7,27,37,25,12,23,7,26,14,29,43,22,14,11,72),
+  mod_positive  = c(17,22,12,41,28,32,21,18,31,26,19,57,41,21,48,14,64,25,53,50,27,25,13,48),
+  very_positive = c(4,15,5,3,19,11,14,6,3,17,5,12,20,12,12,4,22,19,23,18,9,4,7,9)
+) %>%
+  mutate(
+    total              = very_negative + mod_negative + mod_positive + very_positive,
+    nvivo_score        = (very_negative * -2 + mod_negative * -1 +
+                          mod_positive * 1 + very_positive * 2) / total,
+    nvivo_pct_positive = (mod_positive + very_positive) / total,
+    nvivo_pct_negative = (very_negative + mod_negative) / total
+  )
+
+sentiment_comparison <- nvivo_sentiment %>%
+  left_join(afinn_scores, by = "name") %>%
+  left_join(bing_scores,  by = "name")
+```
+
+---
+
+# 1. Topic Modeling
+
+## 1.1 Unsupervised LDA: Top Terms per Topic
+
+```{r lda-terms, fig.cap="Top 10 words per topic from unsupervised LDA (k=6). Each panel represents one discovered theme."}
+tidy(lda_model, matrix = "beta") %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  mutate(
+    term  = reorder_within(term, beta, topic),
+    topic = paste("Topic", topic)
+  ) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title    = "Unsupervised LDA — Top 10 Terms per Topic",
+    subtitle = "24 Alaska Fisher Oral History Interviews",
+    x = NULL, y = "Word-topic probability (β)"
+  ) 
+
+topicmodels::terms(lda_model, 10) %>%
+  as.data.frame() %>%
+  knitr::kable(caption = "Unsupervised LDA: Top 10 terms per topic")
+```
+
+## 1.2 Unseeded LDA: Top Terms per Topic
+
+```{r}
+terms(lda_unseeded, 10) %>%
+  as.data.frame() %>%
+  knitr::kable(caption = "Unseeded: Top 10 terms per topic")
+
+```
+
+
+## 1.3 Seeded LDA: Full 6 Topics
+
+```{r}
+terms(lda_seeded, 10) %>%
+  as.data.frame() %>%
+  knitr::kable(caption = "Full 6 topics: adding seeded subsistence and economic from unseeded")
+```
+
+
+## 1.4 Interview-Topic Proportions (Seeded LDA)
+
+```{r topic-proportions, fig.height=9, fig.cap="Proportion of each topic in each interview based on seeded LDA. Each bar sums to 1. Interviews are sorted by their change topic proportion."}
+as.data.frame(lda_seeded$theta) %>%
+  rownames_to_column("name") %>%
+  pivot_longer(-name, names_to = "topic", values_to = "proportion") %>%
+  mutate(
+    short_name = str_extract(name, "^[^_]+"),
+    topic = factor(topic, levels = c("change", "community", "family",
+                                     "subsistence", "economic", "other"))
+  ) %>%
+  group_by(name) %>%
+  mutate(change_prop = proportion[topic == "change"]) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder(short_name, change_prop),
+             y = proportion, fill = topic)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title    = "Interview-Level Topic Proportions (Seeded LDA)",
+    subtitle = "Sorted by change topic proportion. Each bar = one interview.",
+    x = NULL, y = "Proportion", fill = "Topic"
+  )  +
+  theme(axis.text.y = element_text(size = 8))
+```
+
+---
+
+# 2. Sentiment Analysis
+
+## 2.1 Emotional Tone Across All Interviews (NRC)
+
+```{r nrc-overall, fig.cap="Overall emotional tone across all 24 interviews using the NRC lexicon. Bars show the proportion of words associated with each of 10 emotion/valence categories."}
+ggplot(nrc_overall,
+       aes(x = reorder(sentiment, proportion),
+           y = proportion, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "anger"        = "#C0392B", "anticipation" = "#E67E22",
+    "disgust"      = "#7D3C98", "fear"         = "#2C3E50",
+    "joy"          = "#F1C40F", "negative"     = "#922B21",
+    "positive"     = "#1E8449", "sadness"      = "#2980B9",
+    "surprise"     = "#16A085", "trust"        = "#27AE60"
+  )) +
+  labs(
+    title    = "Emotional Tone Across All 24 Interviews",
+    subtitle = "NRC Lexicon: Alaska Fisher Oral Histories",
+    x = NULL, y = "Proportion of emotional words"
+  ) 
+```
+
+
+## 2.2 AFINN Sentiment per Interview
+
+```{r afinn-bar, fig.cap="Mean AFINN sentiment score per interview. Blue = net positive word score; Red = net negative. Wilson scores most negative; Shankle most positive, consistent with NVivo findings."}
+afinn_scores %>%
+  mutate(
+    short_name = str_extract(name, "^[^_]+"),
+    valence    = if_else(afinn_mean >= 0, "Positive", "Negative")
+  ) %>%
+  ggplot(aes(x = reorder(short_name, afinn_mean),
+             y = afinn_mean, fill = valence)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_manual(values = c("Positive" = "#2980B9",
+                                "Negative" = "#C0392B")) +
+  labs(
+    title    = "AFINN Sentiment per Interview (tidytext)",
+    subtitle = "Positive = net positive word score; Negative = net negative",
+    x = NULL, y = "Mean AFINN score", fill = NULL
+  ) 
+```
+
+## 2.3 NVivo Sentiment Distribution per Interview
+
+```{r nvivo-sentiment-bar, fig.cap="Proportional distribution of NVivo sentiment categories (A=very negative, B=moderately negative, C=moderately positive, D=very positive) per interview."}
+nvivo_sentiment %>%
+  select(name, very_negative, mod_negative, mod_positive, very_positive) %>%
+  pivot_longer(-name, names_to = "category", values_to = "count") %>%
+  mutate(
+    category   = factor(category,
+                        levels = c("very_negative", "mod_negative",
+                                   "mod_positive",  "very_positive")),
+    short_name = str_extract(name, "^[^_]+")
+  ) %>%
+  ggplot(aes(x = reorder(short_name, count),
+             y = count, fill = category)) +
+  geom_col(position = "fill") +
+  coord_flip() +
+  scale_fill_manual(
+    values = c(
+      "very_negative" = "#922B21",
+      "mod_negative"  = "#E59866",
+      "mod_positive"  = "#7FB3D3",
+      "very_positive" = "#1A5276"
+    ),
+    labels = c("Very negative (A)", "Mod. negative (B)",
+               "Mod. positive (C)", "Very positive (D)")
+  ) +
+  labs(
+    title    = "NVivo Sentiment Distribution per Interview",
+    subtitle = "Categories from NVivo autocoding",
+    x = NULL, y = "Proportion", fill = "Category"
+  )
+```
+
+## 2.4 AFINN vs NVivo Sentiment Comparison
+
+```{r afinn-vs-nvivo, fig.cap="Scatter plot comparing AFINN automated sentiment scores against NVivo weighted sentiment scores. r = 0.68, p < 0.001. Each point = one interview."}
+sentiment_comparison %>%
+  mutate(short_name = str_extract(name, "^[^_]+")) %>%
+  ggplot(aes(x = nvivo_score, y = afinn_mean, label = short_name)) +
+  geom_point(size = 3, color = "#2980B9", alpha = 0.8) +
+  geom_smooth(method = "lm", color = "#C0392B", se = TRUE) +
+  geom_text(size = 2.8, vjust = -0.8) +
+  labs(
+    title    = "AFINN (tidytext) vs NVivo Sentiment",
+    subtitle = "r = 0.68, p < 0.001",
+    x = "NVivo weighted score (negative ← 0 → positive)",
+    y = "AFINN mean word score"
+  )
+```
+
+---
+
+*Generated using tidytext, topicmodels, seededlda, and quanteda.*
